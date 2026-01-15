@@ -1,5 +1,5 @@
-const envFile = process.env.NODE_ENV === "production" ? ".env.production" : ".env";
-require("dotenv").config({ path: envFile });
+// const envFile = process.env.NODE_ENV === "production" ? ".env.production" : ".env";
+// require("dotenv").config({ path: envFile });
 
 const app = require('./src/app.js');
 const logger = require('./src/utils/logger.js');
