@@ -1,0 +1,24 @@
+[
+  {
+    "id": "option2",
+    "title": "5 crédits", 
+    "credits": 5,
+    "price": 5,
+    "subscription": "forfait"
+    
+  },
+  {
+    "id": "option3", 
+    "title": "15 crédits",
+    "credits": 15,
+    "price": 10,
+    "subscription": "forfait"
+  },
+  {
+    "id": "option4",
+    "title": "Abonnement mensuel", 
+    "credits": null,
+    "price": 12,
+    "subscription": "abonnement"
+  }
+]
