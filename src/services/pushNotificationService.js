@@ -1,14 +1,11 @@
 // backend/src/services/pushNotificationService.js
 const admin = require('firebase-admin');
 
-// Initialize Firebase Admin SDK
-const serviceAccount = require('../../firebase-service-account.json');
-
-
+// Initialize Firebase Admin SDK using environment variables
 if (!admin.apps.length) {
     admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: 'winger-13'
+        credential: admin.credential.applicationDefault(),
+        projectId: process.env.FIREBASE_PROJECT_ID // Optional: Add project ID from env variables
     });
 }
 
@@ -46,7 +43,6 @@ const sendExpoNotification = async (expoPushToken, title, body, data = {}) => {
         throw error;
     }
 };
-
 
 const sendFirebaseNotification = async (fcmToken, title, body, data = {}) => {
     try {
@@ -163,7 +159,7 @@ const sendBulkPushNotifications = async (tokens, title, body, data = {}) => {
         try {
             const message = {
                 tokens: fcmTokens,
-                notification: {title, body},
+                notification: { title, body },
                 data: {
                     type: data.type || 'message',
                     chatId: data.chatId?.toString() || '',

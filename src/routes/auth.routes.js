@@ -12,11 +12,20 @@ const {
     changePassword
 } = require('../controllers/auth.controller');
 
-const {validate} = require('../middlewares/validationMiddleware');
+const { validate } = require('../middlewares/validationMiddleware');
 const authenticateToken = require('../middlewares/autheticationMiddleware');
-const {mobileLogin} = require("../controllers/auth.mobile.controller");
-// Initialize Firebase Admin SDK
-require('../../firebase-service-account.json');
+const { mobileLogin } = require("../controllers/auth.mobile.controller");
+
+// Initialize Firebase Admin SDK using environment variables
+const admin = require('firebase-admin');
+if (!admin.apps.length) {
+    admin.initializeApp({
+        credential: admin.credential.applicationDefault(),
+    });
+} else {
+    admin.app(); // if already initialized, use the existing instance
+}
+
 /**
  * @swagger
  * /api/auth/register:
@@ -75,6 +84,7 @@ require('../../firebase-service-account.json');
  *                   type: integer
  */
 router.post('/register', validate, register);
+
 /**
  * @swagger
  * /api/auth/login:
@@ -103,7 +113,6 @@ router.post('/login', validate, login);
  */
 router.get('/refreshToken', refreshToken);
 
-
 /**
  * @swagger
  * /api/auth/login-mobile:
@@ -131,12 +140,13 @@ router.post('/login-mobile', validate, mobileLogin);
  *         description: Success
  */
 router.get('/logout', authenticateToken, logout);
+
 /**
  * @swagger
- * /api/auth/logout :
+ * /api/auth/logoutMobile :
  *   get:
- *     summary: Logout a user
- *     description: Logout a user and delete the user refresh token
+ *     summary: Logout a user from mobile
+ *     description: Logout a user from mobile app and delete the user refresh token
  *     tags:
  *      - Authentication
  *     responses:
@@ -144,7 +154,6 @@ router.get('/logout', authenticateToken, logout);
  *         description: Success
  */
 router.get('/logoutMobile', authenticateToken, logoutMobile);
-
 
 /**
  * @swagger
@@ -159,7 +168,6 @@ router.get('/logoutMobile', authenticateToken, logoutMobile);
  *         description: Success
  */
 router.post('/verifyEmail', verifyEmail);
-
 
 /**
  * @swagger
@@ -193,7 +201,7 @@ router.post('/resetPassword', resetPassword);
  * @swagger
  * /api/auth/changePassword :
  *   post:
- *     summary: change password for a user
+ *     summary: Change password for a user
  *     description: Allows a user to change his password
  *     tags:
  *      - Authentication
@@ -202,6 +210,5 @@ router.post('/resetPassword', resetPassword);
  *         description: Success
  */
 router.post('/changePassword', authenticateToken, changePassword);
-
 
 module.exports = router;
