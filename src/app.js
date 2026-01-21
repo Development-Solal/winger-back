@@ -21,6 +21,7 @@ const allowedOrigins = [
     'https://winger.fr',
     'http://localhost:3000',
     'http://localhost:5173',
+    'https://dev.winger.fr'
 ];
 
 const corsOptions = {
