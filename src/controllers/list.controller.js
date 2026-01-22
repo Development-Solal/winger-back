@@ -5,9 +5,9 @@ const path = require("path");
 const XLSX = require("xlsx");
 
 const filePathTown = path.join(__dirname, "..", "assets", "ListTowns.xlsx");
-const filePathLanguage = path.join(process.cwd(), "assets", "ListLanguage.xlsx");
-const filePathNationality = path.join(process.cwd(), "assets", "ListNationality.xlsx");
-const filePathRegion = path.join(process.cwd(), "assets", "ListRegion.xlsx");
+const filePathLanguage = path.join(__dirname, "..", "assets", "ListLanguage.xlsx");
+const filePathNationality = path.join(__dirname, "..", "assets", "ListNationality.xlsx");
+const filePathRegion = path.join(__dirname, "..", "assets", "ListRegion.xlsx");
 
 const updateTownCodesFromXlsx = async (req, res) => {
   try {
