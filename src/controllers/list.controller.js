@@ -4,7 +4,7 @@ const { Sequelize } = require('sequelize'); // Add this line
 const path = require("path");
 const XLSX = require("xlsx");
 
-const filePathTown = path.join(process.cwd(), "assets", "ListTowns.xlsx");
+const filePathTown = path.join(__dirname, "..", "assets", "ListTowns.xlsx");
 const filePathLanguage = path.join(process.cwd(), "assets", "ListLanguage.xlsx");
 const filePathNationality = path.join(process.cwd(), "assets", "ListNationality.xlsx");
 const filePathRegion = path.join(process.cwd(), "assets", "ListRegion.xlsx");
