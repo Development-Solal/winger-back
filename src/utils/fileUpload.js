@@ -41,7 +41,6 @@ const generateFilename = (originalname, type = 'file', customId = null) => {
 const getRelativePath = (type) => {
     switch(type) {
         case 'aidant-profile-pic':
-        case 'aidant-pro-profile-pic':
             return 'aidant/profile_pics';
 
         case 'aide-profile-pic':
@@ -63,52 +62,37 @@ const getRelativePath = (type) => {
  * @returns {Promise<Object>} { url, path, filename }
  */
 
-const testO2SwitchEndpoint = async () => {
-    try {
-        console.log('Testing endpoint:', O2SWITCH_UPLOAD_URL);
-
-        const response = await axios.get(O2SWITCH_UPLOAD_URL, {
-            maxRedirects: 0,
-            validateStatus: () => true // Accept any status
-        });
-
-        console.log('Endpoint test result:', {
-            status: response.status,
-            finalUrl: response.request?.res?.responseUrl,
-            redirectLocation: response.headers.location
-        });
-
-        if (response.status >= 300 && response.status < 400) {
-            console.warn('⚠️ Endpoint redirects to:', response.headers.location);
-            console.warn('Update O2SWITCH_UPLOAD_URL to:', response.headers.location);
-        }
-    } catch (error) {
-        console.error('Endpoint test failed:', error.message);
-    }
-};
 
 const uploadToO2Switch = async (localFilePath, type, customId = null) => {
-    testO2SwitchEndpoint();
     try {
         const originalname = path.basename(localFilePath);
         const filename = generateFilename(originalname, type, customId);
         const relativePath = getRelativePath(type);
+
+        // Verify file exists
+        if (!fs.existsSync(localFilePath)) {
+            throw new Error(`Local file not found: ${localFilePath}`);
+        }
 
         const form = new FormData();
         form.append('path', relativePath);
         form.append('filename', filename);
         form.append('file', fs.createReadStream(localFilePath));
 
+        console.log('📤 Uploading to o2switch...', {
+            type,
+            original: originalname,
+            destination: `${relativePath}/${filename}`
+        });
+
         const response = await axios.post(O2SWITCH_UPLOAD_URL, form, {
-            headers: {
-                ...form.getHeaders(),
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-            },
+            headers: form.getHeaders(),
             maxContentLength: Infinity,
             maxBodyLength: Infinity,
-            timeout: 60000,
-            maxRedirects: 5
+            timeout: 60000
         });
+
+        console.log('✅ Upload successful:', response.data);
 
         return {
             url: response.data.url,
@@ -117,7 +101,11 @@ const uploadToO2Switch = async (localFilePath, type, customId = null) => {
         };
 
     } catch (error) {
-        console.error('o2switch upload error:', error.message);
+        console.error('❌ o2switch upload error:', {
+            message: error.message,
+            status: error.response?.status,
+            data: error.response?.data
+        });
         throw new Error(`Failed to upload to o2switch: ${error.message}`);
     }
 };
