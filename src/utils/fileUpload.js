@@ -69,9 +69,9 @@ const uploadToO2Switch = async (localFilePath, type, customId = null) => {
         const relativePath = getRelativePath(type);
 
         const form = new FormData();
-        form.append('file', fs.createReadStream(localFilePath));
         form.append('path', relativePath);
         form.append('filename', filename);
+        form.append('file', fs.createReadStream(localFilePath));
 
         const response = await axios.post(O2SWITCH_UPLOAD_URL, form, {
             headers: {
