@@ -62,7 +62,33 @@ const getRelativePath = (type) => {
  * @param {string} customId - Custom ID (optional)
  * @returns {Promise<Object>} { url, path, filename }
  */
+
+const testO2SwitchEndpoint = async () => {
+    try {
+        console.log('Testing endpoint:', O2SWITCH_UPLOAD_URL);
+
+        const response = await axios.get(O2SWITCH_UPLOAD_URL, {
+            maxRedirects: 0,
+            validateStatus: () => true // Accept any status
+        });
+
+        console.log('Endpoint test result:', {
+            status: response.status,
+            finalUrl: response.request?.res?.responseUrl,
+            redirectLocation: response.headers.location
+        });
+
+        if (response.status >= 300 && response.status < 400) {
+            console.warn('⚠️ Endpoint redirects to:', response.headers.location);
+            console.warn('Update O2SWITCH_UPLOAD_URL to:', response.headers.location);
+        }
+    } catch (error) {
+        console.error('Endpoint test failed:', error.message);
+    }
+};
+
 const uploadToO2Switch = async (localFilePath, type, customId = null) => {
+    testO2SwitchEndpoint();
     try {
         const originalname = path.basename(localFilePath);
         const filename = generateFilename(originalname, type, customId);
@@ -77,7 +103,11 @@ const uploadToO2Switch = async (localFilePath, type, customId = null) => {
             headers: {
                 ...form.getHeaders(),
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-            }
+            },
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            timeout: 60000,
+            maxRedirects: 5
         });
 
         return {
