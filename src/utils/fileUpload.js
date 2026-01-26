@@ -75,7 +75,8 @@ const uploadToO2Switch = async (localFilePath, type, customId = null) => {
 
         const response = await axios.post(O2SWITCH_UPLOAD_URL, form, {
             headers: {
-                ...form.getHeaders()
+                ...form.getHeaders(),
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
             },
             maxContentLength: Infinity,
             maxBodyLength: Infinity,
