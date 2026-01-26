@@ -28,8 +28,25 @@ const path = require("path");
 const fs = require("fs");
 const logger = require("../utils/logger");
 
-// Multer configuration
+//new
+const {
+    uploadToO2Switch,
+    cleanupTempFile,
+    getPublicUrl
+} = require("../utils/fileUpload");
+
+//new
 const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, '/tmp');
+    },
+    filename: (req, file, cb) => {
+        cb(null, `temp-${Date.now()}${path.extname(file.originalname)}`);
+    }
+});
+
+// Multer configuration
+const storage2 = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, "assets/aide/profile_pics");
     },
@@ -40,29 +57,86 @@ const storage = multer.diskStorage({
     },
 });
 
-const upload = multer({storage}).single("profile_pic");
+//new
+const upload = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 }
+}).single("profile_pic");
+
+const upload2 = multer({storage}).single("profile_pic");
+
+//new
+const handleMulterUpload = (req, res, fileType) => {
+    return new Promise((resolve, reject) => {
+        upload(req, res, async (err) => {
+            if (err) {
+                return reject({ status: 400, message: "File upload failed." });
+            }
+
+            if (!req.file) {
+                return reject({ status: 400, message: "No file uploaded." });
+            }
+
+            try {
+                console.log('📤 Uploading to o2switch...', {
+                    type: fileType,
+                    original: req.file.originalname
+                });
+
+                // Upload to o2switch with specific type
+                const result = await uploadToO2Switch(
+                    req.file.path,
+                    fileType
+                );
+
+                console.log('✅ Upload successful:', result);
+
+                // Cleanup temp
+                await cleanupTempFile(req.file.path);
+
+                // Add to req
+                req.uploadedFile = {
+                    url: result.url,
+                    path: result.path,
+                    filename: result.filename
+                };
+
+                resolve();
+
+            } catch (uploadError) {
+                await cleanupTempFile(req.file.path);
+                reject({
+                    status: 500,
+                    message: "Upload to storage failed"
+                });
+            }
+        });
+    });
+};
+
+//new
+const getProfilePicPath = (req) => {
+    return req.uploadedFile ? req.uploadedFile.path : null;
+};
 
 const convertToNull = (value) => (value === "" ? null : value);
 
 // Create a new ProfileAide
 const createProfileAide = async (req, res) => {
     console.log("inside create profile aide" , req);
-    upload(req, res, async (err) => {
-        if (err) {
-            console.error("Multer error:", err);
-            return res.status(400).json({ message: "File upload failed." });
-        }
 
         const transaction = await sequelize.transaction();
 
         try {
+            await handleMulterUpload(req, res, 'aide-profile-pic');
+            const profilePicPath = getProfilePicPath(req);
             const profileData = extractProfileData(req);
             const aidant = await validateAidant(profileData.userEmail, transaction);
 
             await validateAideLimit(aidant, profileData.gdpr_aide_id, transaction);
 
             const profileNumber = await generateProfileNumber(transaction);
-            const profilePicPath = req.file ? `aide/profile_pics/${req.file.filename}` : null;
+            //const profilePicPath = req.file ? `aide/profile_pics/${req.file.filename}` : null;
             const allRequired = await checkRequiredAcceptance(aidant, profileData.gdpr_aide_id, transaction);
             console.log("allRequired",allRequired);
 
@@ -89,7 +163,6 @@ const createProfileAide = async (req, res) => {
             }
             handleError(error, res);
         }
-    });
 };
 
 // ============ Helper Functions ============
@@ -385,71 +458,6 @@ function handleError(error, res) {
     const errorMessage = error?.errors?.[0]?.message || "An unexpected error occurred.";
     return res.status(500).json({ message: errorMessage });
 }
-
-// // Rest of your functions stay the same...
-// const getAllAideByAidant = async (req, res) => {
-//   const { decodedUserId, decodedAideId } = req.body;
-//
-//   let favoriteAideIds = [];
-//
-//   try {
-//     const profiles = await ProfileAide.findAll({
-//       where: { aidant_id: decodedUserId, id: { [sequelize.Op.ne]: decodedAideId } },
-//       attributes: ["id", "profile_pic", "name"],
-//       include: [
-//         {
-//           model: ProfileAidant,
-//           as: "ProfileAidant",
-//           attributes: ["id", "profile_pic", "profile_type_id", "first_name", "last_name", "online", "createdAt"],
-//           where: {
-//             // active: true,
-//             // userId: getGdprConsentWhereClause(),
-//             ...getGdprConsentWhereClause(),
-//           },
-//           include: [
-//             { model: ListAge, as: "age", attributes: ["title"] },
-//             { model: ListTown, as: "town", attributes: ["town"] },
-//           ],
-//         },
-//         { model: ListAge, as: "age", attributes: ["title"] },
-//         { model: ListTown, as: "town", attributes: ["town"] },
-//       ],
-//       order: [[{ model: ProfileAidant, as: "ProfileAidant" }, "first_name", "ASC"]],
-//     });
-//
-//     const favoriteAides = await Favorite.findAll({
-//       where: { aidant_id: decodedUserId },
-//       attributes: ["aidant_id", "aide_id", "fav_aide_id"],
-//     });
-//
-//     // favoriteAideIds = favoriteAides.map((fav) => fav.fav_aide_id);
-//     favoriteAideIds = favoriteAides;
-//
-//     for (const profile of profiles) {
-//       if (profile.ProfileAidant && profile.ProfileAidant.profile_type_id === 2) {
-//         const aidantPro = await ProfileAidantPro.findOne({
-//           where: { aidant_id: profile.ProfileAidant.id },
-//           attributes: ["company_name", "company_description"],
-//         });
-//
-//         // Attach aidantPro data to profile
-//         if (aidantPro) {
-//           profile.dataValues.aidantPro = aidantPro;
-//         }
-//       }
-//     }
-//
-//     const response = profiles.map((profile) => ({
-//       ...profile.toJSON(),
-//       isFavorite: favoriteAideIds,
-//     }));
-//
-//     res.json(response);
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// };
-
 
 const getAllAideByAidant = async (req, res) => {
     const {userId} = req.params;
@@ -979,7 +987,6 @@ const suspendAideProfile = async (req, res) => {
         return res.status(500).json({message: error.message});
     }
 };
-
 
 module.exports = {
     getAllProfileAides,

@@ -21,8 +21,25 @@ const {
 } = require("../utils/mail");
 const logger = require("../utils/logger");
 
-// Multer configuration
+//new
+const {
+    uploadToO2Switch,
+    cleanupTempFile,
+    getPublicUrl
+} = require("../utils/fileUpload");
+
+//new
 const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, '/tmp');
+    },
+    filename: (req, file, cb) => {
+        cb(null, `temp-${Date.now()}${path.extname(file.originalname)}`);
+    }
+});
+
+// Multer configuration
+const storage2 = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, "assets/aidant/profile_pics");
     },
@@ -35,7 +52,13 @@ const storage = multer.diskStorage({
 
 const gdprConsentService = require("../services/gdprConsentService");
 
-const upload = multer({storage}).single("profile_pic");
+//new
+const upload = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 }
+}).single("profile_pic");
+
+const upload2 = multer({storage}).single("profile_pic");
 
 const createUser = async (email, hashedPassword, first_name, last_name, emailToken, transaction) => {
     const defaultCredits = parseInt(process.env.DEFAULT_CREDITS_ON_REGISTRATION, 10) || 0;
@@ -55,7 +78,57 @@ const createUser = async (email, hashedPassword, first_name, last_name, emailTok
     );
 };
 
-const handleMulterUpload = (req, res) => {
+
+//new
+const handleMulterUpload = (req, res, fileType) => {
+    return new Promise((resolve, reject) => {
+        upload(req, res, async (err) => {
+            if (err) {
+                return reject({ status: 400, message: "File upload failed." });
+            }
+
+            if (!req.file) {
+                return reject({ status: 400, message: "No file uploaded." });
+            }
+
+            try {
+                console.log('📤 Uploading to o2switch...', {
+                    type: fileType,
+                    original: req.file.originalname
+                });
+
+                // Upload to o2switch with specific type
+                const result = await uploadToO2Switch(
+                    req.file.path,
+                    fileType
+                );
+
+                console.log('✅ Upload successful:', result);
+
+                // Cleanup temp
+                await cleanupTempFile(req.file.path);
+
+                // Add to req
+                req.uploadedFile = {
+                    url: result.url,
+                    path: result.path,
+                    filename: result.filename
+                };
+
+                resolve();
+
+            } catch (uploadError) {
+                await cleanupTempFile(req.file.path);
+                reject({
+                    status: 500,
+                    message: "Upload to storage failed"
+                });
+            }
+        });
+    });
+};
+
+const handleMulterUpload2 = (req, res) => {
     return new Promise((resolve, reject) => {
         upload(req, res, (err) => {
             if (err) {
@@ -128,7 +201,12 @@ const generateProfileNumber = async (prefix, transaction) => {
     return `${prefix}-${nextNumber}`;
 };
 
-const getProfilePicPath = (file) => {
+//new
+const getProfilePicPath = (req) => {
+    return req.uploadedFile ? req.uploadedFile.path : null;
+};
+
+const getProfilePicPath2 = (file) => {
     return file ? `aidant/profile_pics/${file.filename}` : null;
 };
 
@@ -226,7 +304,7 @@ const buildUserResponse = (newUser, newProfileAidant, includeAccessToken = false
 // CORE CREATION LOGIC
 // ============================================================================
 
-const createProfileAidantCore = async (req, profilePrefix, emailTokenGenerator, emailSender, profileTypeKey, source) => {
+const createProfileAidantCore = async (req, profilePrefix, emailTokenGenerator, emailSender, profileTypeKey, source, profilePicPath) => {
     const {
         profile_type,
         first_name,
@@ -254,7 +332,6 @@ const createProfileAidantCore = async (req, profilePrefix, emailTokenGenerator, 
 
         const profileType = await findProfileType(profile_type, transaction);
         const profileNumber = await generateProfileNumber(profilePrefix, transaction);
-        const profilePicPath = getProfilePicPath(req.file);
 
         const newProfileAidant = await ProfileAidant.create(
             {
@@ -290,7 +367,7 @@ const createProfileAidantCore = async (req, profilePrefix, emailTokenGenerator, 
     }
 };
 
-const createProfileAidantProCore = async (req, profilePrefix, emailTokenGenerator, emailSender, source) => {
+const createProfileAidantProCore = async (req, profilePrefix, emailTokenGenerator, emailSender, source, profilePicPath) => {
     const {
         profile_type,
         first_name,
@@ -319,7 +396,6 @@ const createProfileAidantProCore = async (req, profilePrefix, emailTokenGenerato
 
         const profileType = await findProfileType(profile_type, transaction);
         const profileNumber = await generateProfileNumber(profilePrefix, transaction);
-        const profilePicPath = getProfilePicPath(req.file);
 
         const newProfileAidant = await ProfileAidant.create(
             {
@@ -376,14 +452,20 @@ const createProfileAidantProCore = async (req, profilePrefix, emailTokenGenerato
 
 const createProfileAidant = async (req, res) => {
     try {
-        await handleMulterUpload(req, res);
+
+        //new
+        await handleMulterUpload(req, res, 'aidant-profile-pic');
+        const profilePicPath = getProfilePicPath(req);
+
+       // await handleMulterUpload(req, res);
         const {newUser, newProfileAidant, accessToken} = await createProfileAidantCore(
             req,
             "PAR",
             generateEmailToken,
             sendVerificationEmail,
             "aidant",
-            req.body.source || "web"
+            req.body.source || "web",
+            profilePicPath
         );
 
         setAuthCookie(res, accessToken);
@@ -398,13 +480,18 @@ const createProfileAidant = async (req, res) => {
 
 const createProfileAidantPro = async (req, res) => {
     try {
-        await handleMulterUpload(req, res);
+        //new
+        await handleMulterUpload(req, res, 'aidant-profile-pic');
+        const profilePicPath = getProfilePicPath(req);
+
+        //await handleMulterUpload(req, res);
         const {newUser, newProfileAidant, accessToken} = await createProfileAidantProCore(
             req,
             "PRO",
             generateEmailToken,
             sendVerificationEmail,
-            req.body.source || "web"
+            req.body.source || "web",
+            profilePicPath
         );
 
         setAuthCookie(res, accessToken);

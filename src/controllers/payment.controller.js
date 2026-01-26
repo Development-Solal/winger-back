@@ -75,51 +75,6 @@ const getPricingOptions = async (req,res) => {
   }
 };
 
-
-// TeST
-// const processPayment = async (req, res) => {
-//     try {
-//         const paymentPayload = {
-//             authentify: {
-//                 id_merchant: process.env.MIPS_MERCHANT_ID,
-//                 id_entity: process.env.MIPS_ENTITY_ID,
-//                 id_operator: process.env.MIPS_OPERATOR_ID,
-//                 operator_password: process.env.MIPS_OPERATOR_PASSWORD
-//             },
-//             order: {
-//                 id_order: "INV5026",
-//                 currency: "MUR",
-//                 amount: 10.25
-//             },
-//             iframe_behavior: {
-//                 height: 400,
-//                 width: 350,
-//                 custom_redirection_url: "www.example.com",
-//                 language: "EN"
-//             },
-//             request_mode: "simple",
-//             touchpoint: "web"
-//         };
-
-//         const response = await axios.post(process.env.MIPS_API_URL, paymentPayload, {
-//             headers: {
-//                 "Authorization": getAuthHeader(),
-//                 "Accept": "application/json, text/html, application/xml, multipart/form-data, application/EDIFACT, text/plain",
-//                 "Content-Type": "application/json",
-//                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.78 Safari/537.36"
-//             }
-//         });
-
-//         res.json(response.data);
-//     } catch (error) {
-//         console.error("MiPS API Error:", error.response?.data || error.message);
-//         res.status(error.response?.status || 500).json({
-//             error: "Payment request failed",
-//             details: error.response?.data || error.message
-//         });
-//     }
-// };
-
 const processPayment = async (req, res) => {
     const { aidant_id, amount, subscription_type, credits, iframe_behavior } = req.body;
     const id_order = generateOrderId();
@@ -290,16 +245,6 @@ const processPaymentPaypal = async (req, res) => {
         });
       }
 
-      // await PaymentHistory.create({
-      //   id: id_order,
-      //   aidant_id: aidant_id,
-      //   subscription_type,
-      //   credits,
-      //   price: amount,
-      //   payment_status: "pending", // Initially pending
-      //   transaction_id: subscriptionId,
-      // });
-  
       await Subscription.create({
         id: subscriptionId,
         aidant_id,
