@@ -77,10 +77,7 @@ const uploadToO2Switch = async (localFilePath, type, customId = null) => {
             headers: {
                 ...form.getHeaders(),
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-            },
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity,
-            timeout: 60000
+            }
         });
 
         return {
