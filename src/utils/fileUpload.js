@@ -3,8 +3,8 @@ const FormData = require('form-data');
 const fs = require('fs');
 const path = require('path');
 
-const O2SWITCH_UPLOAD_URL = process.env.O2SWITCH_UPLOAD_URL || 'https://preprod.backend.test.fr/api/upload/upload';
-const O2SWITCH_BASE_URL = process.env.O2SWITCH_BASE_URL || 'https://preprod.backend.test.fr';
+const O2SWITCH_UPLOAD_URL = process.env.O2SWITCH_UPLOAD_URL || 'https://preprod-upload-service.winger.fr/upload';
+const O2SWITCH_BASE_URL = process.env.O2SWITCH_BASE_URL || 'https://preprod-upload-service.winger.fr/upload';
 
 /**
  * Generate filename based on type
