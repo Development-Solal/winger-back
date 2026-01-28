@@ -165,16 +165,16 @@ const decryptMipsCallback = async (cryptedData) => {
 
 // This is your IMN URL that MIPS will call
 const mipsWebhook = async (req, res) => {
-    const data = req.body;  
+    const data = req.body;
     try {
         const decrypted = await decryptMipsCallback(data.crypted_callback);
-        logger.info('Decrypted MIPS payload', { decrypted  });
-    
+        logger.info('Decrypted MIPS payload', { decrypted });
+
         const { id_order, status, transaction_id } = decrypted;
         const payment_status = status === 'SUCCESS' ? 'success' : 'failed';
 
         const paymentRecord = await PaymentHistory.findByPk(id_order);
-        
+
         if (!paymentRecord) {
             logger.warn('Payment record not found', { id_order });
             return res.status(404).json({ message: 'Payment record not found' });
@@ -193,31 +193,34 @@ const mipsWebhook = async (req, res) => {
         if (status === 'SUCCESS' && paymentRecord.subscription_type === 'forfait') {
             const user = await User.findByPk(paymentRecord.aidant_id);
             if (user) {
-              user.credits = (user.credits || 0) + (paymentRecord.credits || 0);
-              await user.save();
-            
-              logger.info('Credits added to User', { user: user.id, new_credits: user.credits });
-              const invoicePath = path.join(__dirname, '../../assets/invoice', `${paymentRecord.id}.pdf`);
+                // Add credits to user account
+                user.credits = (user.credits || 0) + (paymentRecord.credits || 0);
+                await user.save();
 
+                logger.info('Credits added to User', { user: user.id, new_credits: user.credits });
 
-              await generateInvoice({
-                id: paymentRecord.id,
-                first_name: user.first_name,
-                last_name: user.last_name,
-                email: user.email,
-                price: paymentRecord.price,
-                subscription_type: "Crédits",
-                payment_date: paymentRecord.updatedAt,
-                payment_method: "Carte bancaire"
-              }, invoicePath);
-              logger.info('Invoice generated', paymentRecord);
+                // Generate the invoice
+                const invoiceResult = await generateInvoice({
+                    id: paymentRecord.id,
+                    first_name: user.first_name,
+                    last_name: user.last_name,
+                    email: user.email,
+                    price: paymentRecord.price,
+                    subscription_type: "Crédits",
+                    payment_date: paymentRecord.updatedAt,
+                    payment_method: "Carte bancaire"
+                }, paymentRecord.id);
 
-              await sendInvoiceEmail(user, invoicePath);
+                logger.info('Invoice generated and uploaded to O2Switch', paymentRecord);
+
+                // Send the invoice by email using the URL from O2Switch
+                await sendInvoiceEmail(user, invoiceResult.url);
 
             } else {
-              logger.warn('User not found for credit update', { user: paymentRecord.aidant_id });
+                logger.warn('User not found for credit update', { user: paymentRecord.aidant_id });
             }
         }
+
         res.status(200).json({ message: 'MIPS webhook processed' });
 
     } catch (err) {
@@ -225,6 +228,7 @@ const mipsWebhook = async (req, res) => {
         res.status(500).json({ message: 'MIPS webhook error', error: err.message });
     }
 };
+
   
 
 //PAYPAL
@@ -282,136 +286,138 @@ const confirmSubscription = async (req, res) => {
     }
 };
 
-const paypalWebhook = async(req, res) => {
+const paypalWebhook = async (req, res) => {
     const event = req.body;
     const eventType = event.event_type;
     const resource = event.resource;
 
     try {
         logger.info("PayPal Webhook Event:", eventType);
-    
+
         switch (eventType) {
-          case "BILLING.SUBSCRIPTION.ACTIVATED": {
-            const subscriptionId = resource.id;
-    
-            // Update subscription status
-            await Subscription.update(
-                {
-                  status: "active",
-                  start_date: resource.start_time,
-                  next_billing_time: resource.billing_info?.next_billing_time || null,
-                  payer_email: resource.subscriber?.email_address || null,
-                },
-                {
-                  where: { id: subscriptionId }
-                }
-            );
-    
-            // Update payment history to success
-            await PaymentHistory.update(
-              { payment_status: "success" },
-              { where: { transaction_id: subscriptionId } }
-            );
-    
-            break;
-          }
-    
-          case "PAYMENT.SALE.COMPLETED": {
-            const subscriptionId = resource.billing_agreement_id;
-            const amount = parseFloat(resource.amount.total);
-            const transactionId = resource.id; // Unique for every recurring payment
-          
-            // Step 1: Find the aidant_id from Subscription table
-            const subscription = await Subscription.findOne({
-              where: { id: subscriptionId }
-            });
-          
-            if (!subscription) {
-                logger.warn(`Subscription not found for ID ${subscriptionId}`);
+            case "BILLING.SUBSCRIPTION.ACTIVATED": {
+                const subscriptionId = resource.id;
+
+                // Update subscription status
+                await Subscription.update(
+                    {
+                        status: "active",
+                        start_date: resource.start_time,
+                        next_billing_time: resource.billing_info?.next_billing_time || null,
+                        payer_email: resource.subscriber?.email_address || null,
+                    },
+                    {
+                        where: { id: subscriptionId }
+                    }
+                );
+
+                // Update payment history to success
+                await PaymentHistory.update(
+                    { payment_status: "success" },
+                    { where: { transaction_id: subscriptionId } }
+                );
+
                 break;
             }
-          
-            const aidantId = subscription.aidant_id;
-          
-            // Step 2: Try to find an existing pending PaymentHistory for this subscriptionId
-            const existingPayment = await PaymentHistory.findOne({
-              where: {
-                transaction_id: transactionId,
-                aidant_id: aidantId,
-              }
-            });
 
-            if (existingPayment) {
-              // Update the existing entry
-              await existingPayment.update({
-                payment_status: "success",
-                price: amount // Optional: update price if needed
-              });
-              logger.info(`Updated existing PaymentHistory for subscription ${subscriptionId}`);
-            } else {
-              // Otherwise, create a new entry (for recurring payment)
-              await PaymentHistory.create({
-                id: generateOrderId(),
-                aidant_id: aidantId,
-                subscription_type: "abonnement",
-                credits: null,
-                price: amount,
-                payment_status: "success",
-                transaction_id: subscriptionId, // ← use transaction ID here for unique entry
-              });
-              logger.info(`Created new PaymentHistory for recurring payment of subscription ${subscriptionId}`);
+            case "PAYMENT.SALE.COMPLETED": {
+                const subscriptionId = resource.billing_agreement_id;
+                const amount = parseFloat(resource.amount.total);
+                const transactionId = resource.id; // Unique for every recurring payment
+
+                // Step 1: Find the aidant_id from Subscription table
+                const subscription = await Subscription.findOne({
+                    where: { id: subscriptionId }
+                });
+
+                if (!subscription) {
+                    logger.warn(`Subscription not found for ID ${subscriptionId}`);
+                    break;
+                }
+
+                const aidantId = subscription.aidant_id;
+
+                // Step 2: Try to find an existing pending PaymentHistory for this subscriptionId
+                const existingPayment = await PaymentHistory.findOne({
+                    where: {
+                        transaction_id: transactionId,
+                        aidant_id: aidantId,
+                    }
+                });
+
+                if (existingPayment) {
+                    // Update the existing entry
+                    await existingPayment.update({
+                        payment_status: "success",
+                        price: amount // Optional: update price if needed
+                    });
+                    logger.info(`Updated existing PaymentHistory for subscription ${subscriptionId}`);
+                } else {
+                    // Otherwise, create a new entry (for recurring payment)
+                    await PaymentHistory.create({
+                        id: generateOrderId(),
+                        aidant_id: aidantId,
+                        subscription_type: "abonnement",
+                        credits: null,
+                        price: amount,
+                        payment_status: "success",
+                        transaction_id: subscriptionId, // ← use transaction ID here for unique entry
+                    });
+                    logger.info(`Created new PaymentHistory for recurring payment of subscription ${subscriptionId}`);
+                }
+
+                const user = await User.findByPk(aidantId);
+                if (user) {
+                    // Generate invoice and upload it
+                    const invoiceResult = await generateInvoice({
+                        id: subscriptionId,
+                        first_name: user.first_name,
+                        last_name: user.last_name,
+                        email: user.email,
+                        price: amount,
+                        subscription_type: "Abonnement",
+                        payment_date: new Date(),
+                        payment_method: "Paypal"
+                    }, subscriptionId);
+
+                    // Send the invoice by email using the URL from the upload
+                    await sendInvoiceEmail(user, invoiceResult.url);
+
+                    logger.info('Invoice generated and email sent', subscriptionId);
+
+                } else {
+                    logger.warn('User not found for credit update', { user: aidantId });
+                }
+
+                logger.info(`Logged recurring payment for subscription ${subscription}`);
+                break;
             }
-          
-            const user = await User.findByPk(aidantId);
-            if (user) {
-              const invoicePath = path.join(__dirname, '../../assets/invoice', `${subscriptionId}.pdf`);
 
-              await generateInvoice({
-                id: subscriptionId,
-                first_name: user.first_name,
-                last_name: user.last_name,
-                email: user.email,
-                price: amount,
-                subscription_type: "Abonnement",
-                payment_date: new Date(),
-                payment_method: "Paypal"
-              }, invoicePath);
-              logger.info('Invoice generated', subscriptionId);
-              
-              await sendInvoiceEmail(user, invoicePath);
+            case "BILLING.SUBSCRIPTION.CANCELLED":
+            case "BILLING.SUBSCRIPTION.SUSPENDED":
+            case "BILLING.SUBSCRIPTION.EXPIRED": {
+                const subscriptionId = resource.id;
+                const newStatus = eventType.split(".")[2].toLowerCase(); // "cancelled", etc.
 
-            } else {
-              logger.warn('User not found for credit update', { user: aidantId });
+                await Subscription.update(
+                    { status: newStatus },
+                    { where: { id: subscriptionId } }
+                );
+
+                break;
             }
 
-            logger.info(`Logged recurring payment for subscription ${subscription}`);
-            break;
-          }
-    
-          case "BILLING.SUBSCRIPTION.CANCELLED":
-          case "BILLING.SUBSCRIPTION.SUSPENDED":
-          case "BILLING.SUBSCRIPTION.EXPIRED": {
-            const subscriptionId = resource.id;
-            const newStatus = eventType.split(".")[2].toLowerCase(); // "cancelled", etc.
-    
-            await Subscription.update(
-              { status: newStatus },
-              { where: { id: subscriptionId } }
-            );
-    
-            break;
-          }
-    
-          default:
-            logger.info("Unhandled event:", eventType);
+            default:
+                logger.info("Unhandled event:", eventType);
         }
-    
+
         return res.status(200).send("OK");
-      } catch (err) {
+    } catch (err) {
         logger.error('Webhook error:', { error: err.message });
         res.status(500).json({ message: 'Webhook error:', error: err.message });
-      }
-}
+    }
+};
+
   
 
 //STATS
