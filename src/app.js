@@ -26,24 +26,33 @@ const allowedOrigins = [
 
 const corsOptions = {
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or Postman)
-        if (!origin) return callback(null, true);
-
-        if (allowedOrigins.includes(origin)) {
+        console.log(`[CORS] Incoming request from origin: "${origin}"`);
+        
+        if (!origin) {
+            console.log('[CORS] ✓ No origin - allowing request');
+            return callback(null, true);
+        }
+        
+        const normalizedOrigin = origin.replace(/\/$/, '');
+        
+        if (allowedOrigins.includes(normalizedOrigin)) {
+            console.log(`[CORS] ✓ Origin allowed: ${normalizedOrigin}`);
             callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));
+            console.log(`[CORS] ✗ Origin blocked: ${normalizedOrigin}`);
+            console.log(`[CORS] Allowed origins:`, allowedOrigins);
+            callback(null, false); 
         }
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    exposedHeaders: ["Set-Cookie"], // Important for cookies to work
+    exposedHeaders: ["Set-Cookie"], 
 };
 
 app.use(cors(corsOptions));
 
-// Handle preflight requests
+// Handle preflight requests explicitly
 app.options('*', cors(corsOptions));
 
 // Middleware to parse JSON
@@ -53,36 +62,39 @@ app.use(bodyParser.json());
 // Use cookie-parser middleware to parse cookies
 app.use(cookieParser());
 
-//Logger middleware
+// Logger middleware
 app.use(loggerMiddleware);
 
 // Swagger documentation
 setupSwagger(app);
 
-//Monitoring
+// Monitoring
 app.use(metricsMiddleware);
 
 // Register routes
 app.use('/api', routes);
 
+// Metrics endpoint
 app.get('/metrics', async (req, res) => {
     res.set('Content-Type', register.contentType);
     res.end(await register.metrics());
 });
 
+// Health check endpoint
 app.get('/health', (req, res) => {
     res.status(200).json({ status: 'UP' });
 });
 
+// Debug logs endpoint
 app.get('/api/debug/logs', (req, res) => {
     try {
-        const fs = require('fs'); // Add this import at the top of the file
+        const fs = require('fs');
         const logPath = '/home/vacy0949/preprod.backend.winger.fr/app.log';
         const logs = fs.readFileSync(logPath, 'utf8');
         const lines = logs.split('\n').reverse().slice(0, 100).reverse(); // Last 100 lines
         res.json({ logs: lines });
     } catch (error) {
-        res.json({ error: error.message });
+        res.status(500).json({ error: error.message });
     }
 });
 
