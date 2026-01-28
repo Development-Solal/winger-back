@@ -1,39 +1,32 @@
-const { Server } = require("socket.io");
-const { MessageStatus, Message, User } = require("../models");
-const { sendPushNotification } = require("../services/pushNotificationService");
-const { Op } = require("sequelize");
+const {Server} = require("socket.io");
+const {MessageStatus, Message, User} = require("../models");
+const {sendPushNotification} = require("../services/pushNotificationService");
+const {Op} = require("sequelize");
 
 const setupSocket = (server) => {
-    const allowedOrigins = [
-        'https://winger-front.devsolalco.workers.dev',
-        'https://preprod.winger.fr',
-        'https://winger.fr',
-        'https://dev.winger.fr', // Added missing origin
-        'http://localhost:3000',
-        'http://localhost:5173',
-        process.env.FRONTEND_URL,
-        process.env.FRONTEND_EXPO_URL,
-    ].filter(Boolean);
-
     const io = new Server(server, {
         cors: {
             origin: (origin, callback) => {
-                console.log(`[Socket.IO CORS] Checking origin: "${origin}"`);
-                
                 if (!origin) {
-                    console.log('[Socket.IO CORS] ✓ No origin - allowing');
                     return callback(null, true);
                 }
 
-                const normalizedOrigin = origin.replace(/\/$/, '');
+                const allowedOrigins = [
+                    'https://winger-front.devsolalco.workers.dev',
+                    'https://preprod.winger.fr',
+                    'https://winger.fr',
+                    'https://dev.winger.fr', // Added
+                    'http://localhost:3000', // Added for development
+                    'http://localhost:5173', // Added for development
+                    process.env.FRONTEND_URL,
+                    process.env.FRONTEND_EXPO_URL,
+                ].filter(Boolean);
 
-                if (allowedOrigins.includes(normalizedOrigin)) {
-                    console.log(`[Socket.IO CORS] ✓ Origin allowed: ${normalizedOrigin}`);
+                if (allowedOrigins.includes(origin)) {
                     return callback(null, true);
                 }
 
-                console.log(`[Socket.IO CORS] ✗ Origin blocked: ${normalizedOrigin}`);
-                console.log(`[Socket.IO CORS] Allowed origins:`, allowedOrigins);
+                console.warn(`⚠️ CORS blocked origin: ${origin}`);
                 callback(new Error('Not allowed by CORS'));
             },
             methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -44,10 +37,9 @@ const setupSocket = (server) => {
         allowEIO3: true,
         pingTimeout: 60000,
         pingInterval: 25000,
-        connectTimeout: 45000
     });
 
-    // Track online users - using Map with Sets for multiple devices
+    // Track online users - using array for multiple devices
     const onlineUsers = new Map();
 
     // Optional: Add authentication middleware
@@ -63,20 +55,11 @@ const setupSocket = (server) => {
     });
 
     io.on("connection", (socket) => {
-        console.log("✅ [Socket.IO] User connected:", socket.id);
-        console.log(`   - Origin: ${socket.handshake.headers.origin}`);
-        console.log(`   - Transport: ${socket.conn.transport.name}`);
-
-        // Send welcome message
-        socket.emit('welcome', { 
-            message: 'Connected to Winger server!',
-            socketId: socket.id,
-            timestamp: new Date()
-        });
+        console.log("A user connected:", socket.id);
 
         socket.on("joinConversation", (conversationId) => {
             socket.join(conversationId);
-            console.log(`📨 Socket ${socket.id} joined conversation ${conversationId}`);
+            console.log(`Socket ${socket.id} joined conversation ${conversationId}`);
         });
 
         socket.on("joinUserRoom", async (userId) => {
@@ -89,20 +72,19 @@ const setupSocket = (server) => {
             }
             onlineUsers.get(userId.toString()).add(socket.id);
 
-            console.log(`👤 User ${userId} is now online with ${onlineUsers.get(userId.toString()).size} connection(s)`);
+            console.log(`User ${userId} is now online with ${onlineUsers.get(userId.toString()).size} connection(s)`);
 
             try {
                 const unreadMessages = await MessageStatus.findAll({
-                    where: { user_id: userId, status: "sent" },
-                    include: [{ model: Message }],
+                    where: {user_id: userId, status: "sent"},
+                    include: [{model: Message}],
                 });
 
                 if (unreadMessages.length > 0) {
                     io.to(`user_${userId}`).emit("unreadMessages", unreadMessages);
-                    console.log(`📬 Sent ${unreadMessages.length} unread messages to user ${userId}`);
                 }
             } catch (error) {
-                console.error(`❌ Error fetching unread messages for user ${userId}:`, error);
+                console.error(`Error fetching unread messages for user ${userId}:`, error);
             }
         });
 
@@ -114,8 +96,7 @@ const setupSocket = (server) => {
                 const recipientId = message.destination_id.toString();
                 const isRecipientOnline = onlineUsers.has(recipientId) && onlineUsers.get(recipientId).size > 0;
 
-                console.log(`📨 Message sent to conversation ${message.conversation_id}`);
-                console.log(`   - Recipient ${recipientId} online status: ${isRecipientOnline}`);
+                console.log(`Recipient ${recipientId} online status:`, isRecipientOnline);
 
                 // Only send push notification if recipient is offline
                 if (!isRecipientOnline) {
@@ -152,13 +133,13 @@ const setupSocket = (server) => {
                 }
 
             } catch (error) {
-                console.error("❌ Error sending message:", error);
+                console.error("Error sending message:", error);
             }
         });
 
-        socket.on("markAsRead", async ({ conversationId, aidantId }) => {
+        socket.on("markAsRead", async ({conversationId, aidantId}) => {
             try {
-                console.log(`✓ Marking messages as read for conversation ${conversationId}, user ${aidantId}`);
+                console.log(`Marking messages as read for conversation ${conversationId}, user ${aidantId}`);
                 const messages = await Message.findAll({
                     where: {
                         conversation_id: conversationId,
@@ -171,28 +152,27 @@ const setupSocket = (server) => {
 
                 if (messageIds.length > 0) {
                     const [updatedCount] = await MessageStatus.update(
-                        { status: "read" },
+                        {status: "read"},
                         {
                             where: {
-                                message_id: { [Op.in]: messageIds },
-                                status: { [Op.in]: ["sent", "delivered"] }
+                                message_id: {[Op.in]: messageIds},
+                                status: {[Op.in]: ["sent", "delivered"]}
                             }
                         }
                     );
 
-                    console.log(`✅ Marked ${updatedCount} messages as read in conversation ${conversationId}`);
+                    console.log(`Marked ${updatedCount} messages as read in conversation ${conversationId}`);
                 }
 
                 // Emit to the user
-                io.to(`user_${aidantId}`).emit("messageRead", { conversationId });
+                io.to(`user_${aidantId}`).emit("messageRead", {conversationId});
             } catch (error) {
                 console.error("❌ Error marking messages as read:", error);
             }
         });
 
-        socket.on("typing", ({ conversationId, userId, isTyping }) => {
-            socket.to(conversationId).emit("userTyping", { conversationId, userId, isTyping });
-            console.log(`⌨️ User ${userId} ${isTyping ? 'started' : 'stopped'} typing in conversation ${conversationId}`);
+        socket.on("typing", ({conversationId, userId, isTyping}) => {
+            socket.to(conversationId).emit("userTyping", {conversationId, userId, isTyping});
         });
 
         socket.on("disconnect", () => {
@@ -205,13 +185,13 @@ const setupSocket = (server) => {
 
                     if (userSockets.size === 0) {
                         onlineUsers.delete(userId);
-                        console.log(`👋 User ${socket.userId} went offline (no more connections)`);
+                        console.log(`User ${socket.userId} went offline (no more connections)`);
                     } else {
-                        console.log(`📱 User ${socket.userId} still has ${userSockets.size} connection(s)`);
+                        console.log(`User ${socket.userId} still has ${userSockets.size} connection(s)`);
                     }
                 }
             }
-            console.log("🔌 User disconnected:", socket.id);
+            console.log("User disconnected:", socket.id);
         });
 
         // Handle ping-pong for connection health
@@ -220,7 +200,6 @@ const setupSocket = (server) => {
         });
     });
 
-    console.log('✅ Socket.IO initialized successfully');
     return io;
 };
 
