@@ -208,7 +208,7 @@ const mipsWebhook = async (req, res) => {
                     price: paymentRecord.price,
                     subscription_type: "Crédits",
                     payment_date: paymentRecord.updatedAt,
-                    payment_method: "Carte bancaire"
+                    payment_method: "Paypal"
                 }, paymentRecord.id);
 
                 logger.info('Invoice generated and uploaded to O2Switch', paymentRecord);
@@ -345,6 +345,8 @@ const paypalWebhook = async (req, res) => {
                     }
                 });
 
+                //added to change inv
+                const invoiceId = generateOrderId(); //genereta correct correct format inv num
                 if (existingPayment) {
                     // Update the existing entry
                     await existingPayment.update({
@@ -355,7 +357,7 @@ const paypalWebhook = async (req, res) => {
                 } else {
                     // Otherwise, create a new entry (for recurring payment)
                     await PaymentHistory.create({
-                        id: generateOrderId(),
+                        id: invoiceId,
                         aidant_id: aidantId,
                         subscription_type: "abonnement",
                         credits: null,
@@ -370,7 +372,7 @@ const paypalWebhook = async (req, res) => {
                 if (user) {
                     // Generate invoice and upload it
                     const invoiceResult = await generateInvoice({
-                        id: subscriptionId,
+                        id: invoiceId,
                         first_name: user.first_name,
                         last_name: user.last_name,
                         email: user.email,

@@ -33,7 +33,7 @@ const generateInvoice = async (payment, id) => {
   doc.moveDown(1);
 
   // Info
-  doc.fontSize(14).font('Helvetica-Bold').text(`Entreprise individuel Christophe CHARLET`, { align: 'left' });
+  doc.fontSize(14).font('Helvetica-Bold').text(`Entreprise individuelle Christophe CHARLET`, { align: 'left' });
   doc.font('Helvetica').text(`Sunny Lane, 22321 Trou aux Biches, Ile Maurice`, { align: 'left' });
   doc.text(`BRN I23012095`, { align: 'left' });
   doc.moveDown(1);
@@ -52,7 +52,7 @@ const generateInvoice = async (payment, id) => {
   doc.moveDown(1);
 
   doc.fontSize(14).font('Helvetica').text(`Montant payé: ${payment.price} € TTC`, { align: 'left' });
-  doc.text(`Tva: Non Applicable`, { align: 'left' });
+  doc.text(`Tva incluse: 20%`, { align: 'left' });
   doc.text(`Type d'abonnement: ${payment.subscription_type}`, { align: 'left' });
   doc.text(`Date de paiement : ${formattedDate}`, { align: 'left' });
   doc.text(`Méthode de paiement: ${payment.payment_method || 'PayPal'}`, { align: 'left' });
@@ -62,9 +62,11 @@ const generateInvoice = async (payment, id) => {
   doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
   doc.moveDown(1);
 
-  // Footer
+ // Footer
   doc.fontSize(12).font('Helvetica').text('Merci pour votre paiement!', { align: 'center' });
-  doc.text('Si vous avez des questions, contactez-nous à contact@winger.fr', { align: 'center' });
+  doc.text('Contactez-nous sur contact@winger.fr', { align: 'center' });
+  doc.text('si vous avez des questions ou si votre entreprise est assujettie à la TVA', { align: 'center' });
+  doc.text('(merci de nous transmettre votre numéro de TVA).', { align: 'center' });
 
   doc.end();
 
