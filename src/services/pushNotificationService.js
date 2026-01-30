@@ -1,12 +1,39 @@
-// backend/src/services/pushNotificationService.js
 const admin = require('firebase-admin');
 
 // Initialize Firebase Admin SDK using environment variables
 if (!admin.apps.length) {
-    admin.initializeApp({
-        credential: admin.credential.applicationDefault(),
-        projectId: process.env.FIREBASE_PROJECT_ID // Optional: Add project ID from env variables
-    });
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+            projectId: process.env.FIREBASE_PROJECT_ID || 'winger-13'
+        });
+    }
+
+    else if (process.env.FIREBASE_PRIVATE_KEY) {
+        admin.initializeApp({
+            credential: admin.credential.cert({
+                projectId: process.env.FIREBASE_PROJECT_ID,
+                privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+                clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+            }),
+            projectId: process.env.FIREBASE_PROJECT_ID || 'winger-13'
+        });
+    }
+    // Fallback for local development
+    else {
+        try {
+            const serviceAccount = require('../../firebase-service-account.json');
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount),
+                projectId: 'winger-13'
+            });
+            console.log('⚠️  Using local firebase-service-account.json file');
+        } catch (error) {
+            console.error('❌ Firebase initialization failed. No credentials found.', error.toString());
+            throw new Error('Firebase credentials not configured');
+        }
+    }
 }
 
 // Send notification via Expo's push service
@@ -39,12 +66,12 @@ const sendExpoNotification = async (expoPushToken, title, body, data = {}) => {
 
         return await response.json();
     } catch (error) {
-        console.error(' Error sending Expo push notification:', error);
+        console.error('❌ Error sending Expo push notification:', error);
         throw error;
     }
 };
 
-
+// Send notification via Firebase Admin SDK (for native FCM tokens)
 const sendFirebaseNotification = async (fcmToken, title, body, data = {}) => {
     try {
         if (!fcmToken || typeof fcmToken !== 'string' || fcmToken.length < 100) {
@@ -91,13 +118,14 @@ const sendFirebaseNotification = async (fcmToken, title, body, data = {}) => {
 
         const response = await admin.messaging().send(message);
         console.log('✅ Firebase push notification sent:', response);
+
         return response;
 
     } catch (error) {
         console.error('❌ Error sending Firebase push notification:', error);
         console.error('Error code:', error.code);
         console.error('Error message:', error.message);
-        // Handle specific error codes
+
         if (error.code === 'messaging/invalid-registration-token' ||
             error.code === 'messaging/registration-token-not-registered') {
             console.error('🔴 Token is invalid or expired. Should be removed from database.');
@@ -118,14 +146,13 @@ const sendPushNotification = async (token, title, body, data = {}) => {
         return null;
     }
 
-    console.log(` Sending push notification to token: ${token.substring(0, 20)}...`);
+    console.log(`📲 Sending push notification to token: ${token.substring(0, 20)}...`);
 
-    // Determine token type and use appropriate service
     if (token.startsWith('ExponentPushToken')) {
-        console.log(' Using Expo push service');
+        console.log('📱 Using Expo push service');
         return await sendExpoNotification(token, title, body, data);
     } else {
-        console.log(' Using Firebase Admin SDK');
+        console.log('🔥 Using Firebase Admin SDK');
         return await sendFirebaseNotification(token, title, body, data);
     }
 };
@@ -136,15 +163,13 @@ const sendBulkPushNotifications = async (tokens, title, body, data = {}) => {
         return null;
     }
 
-    // Separate tokens by type
     const expoTokens = tokens.filter(token => token.startsWith('ExponentPushToken'));
     const fcmTokens = tokens.filter(token => !token.startsWith('ExponentPushToken'));
 
     const results = [];
 
-    // Send Expo notifications
     if (expoTokens.length > 0) {
-        console.log(` Sending ${expoTokens.length} Expo notifications`);
+        console.log(`📱 Sending ${expoTokens.length} Expo notifications`);
         for (const token of expoTokens) {
             try {
                 const result = await sendExpoNotification(token, title, body, data);
@@ -155,9 +180,8 @@ const sendBulkPushNotifications = async (tokens, title, body, data = {}) => {
         }
     }
 
-    // Send Firebase notifications
     if (fcmTokens.length > 0) {
-        console.log(` Sending ${fcmTokens.length} Firebase notifications`);
+        console.log(`🔥 Sending ${fcmTokens.length} Firebase notifications`);
         try {
             const message = {
                 tokens: fcmTokens,
