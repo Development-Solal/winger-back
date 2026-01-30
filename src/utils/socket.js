@@ -98,45 +98,40 @@ const setupSocket = (server) => {
 
                 console.log(`Recipient ${recipientId} online status:`, isRecipientOnline);
 
-                // Only send push notification if recipient is offline
-                if (!isRecipientOnline) {
-                    try {
-                        const [recipient, sender] = await Promise.all([
-                            User.findByPk(recipientId),
-                            User.findByPk(message.sender_id)
-                        ]);
+                try {
+                    const [recipient, sender] = await Promise.all([
+                        User.findByPk(recipientId),
+                        User.findByPk(message.sender_id)
+                    ]);
 
-                        if (recipient?.expo_push_token && sender) {
-                            const senderName = sender.first_name || 'Someone';
+                    if (recipient?.expo_push_token && sender) {
+                        const senderName = sender.first_name || 'Someone';
 
-                            await sendPushNotification(
-                                recipient.expo_push_token,
-                                `Nouveau message de ${senderName}`,
-                                message.message_text,
-                                {
-                                    type: 'message',
-                                    chatId: message.conversation_id.toString(),
-                                    senderId: message.sender_id.toString(),
-                                    conversationId: message.conversation_id.toString(),
-                                }
-                            );
+                        await sendPushNotification(
+                            recipient.expo_push_token,
+                            `Nouveau message de ${senderName}`,
+                            message.message_text,
+                            {
+                                type: 'message',
+                                chatId: message.conversation_id.toString(),
+                                senderId: message.sender_id.toString(),
+                                conversationId: message.conversation_id.toString(),
+                            }
+                        );
 
-                            console.log(`✅ Push notification sent to offline user ${recipientId}`);
-                        } else if (!recipient?.expo_push_token) {
-                            console.log(`⚠️ User ${recipientId} has no push token`);
-                        }
-                    } catch (pushError) {
-                        console.error('❌ Error sending push notification:', pushError);
+                        console.log(`✅ Push notification sent to offline user ${recipientId}`);
+                    } else if (!recipient?.expo_push_token) {
+                        console.log(`⚠️ User ${recipientId} has no push token`);
                     }
-                } else {
-                    console.log(`📱 User ${recipientId} is online, skipping push notification`);
+                } catch (pushError) {
+                    console.error('❌ Error sending push notification:', pushError);
                 }
+
 
             } catch (error) {
                 console.error("Error sending message:", error);
             }
         });
-
         socket.on("markAsRead", async ({conversationId, aidantId}) => {
             try {
                 console.log(`Marking messages as read for conversation ${conversationId}, user ${aidantId}`);
