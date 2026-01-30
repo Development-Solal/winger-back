@@ -507,14 +507,16 @@ const createProfileAidantPro = async (req, res) => {
 
 const createProfileAidantMobile = async (req, res) => {
     try {
-        await handleMulterUpload(req, res);
+        await handleMulterUpload(req, res, 'aidant-profile-pic');
+        const profilePicPath = getProfilePicPath(req);
         const {newUser, newProfileAidant, accessToken} = await createProfileAidantCore(
             req,
             "PAR",
             generateEmailTokenMobile,
             sendVerificationEmailMobile,
             "aidant",
-            req.body.source || "mobile"
+            req.body.source || "mobile",
+            profilePicPath
         );
 
         setAuthCookie(res, accessToken);
@@ -532,13 +534,15 @@ const createProfileAidantMobile = async (req, res) => {
 
 const createProfileAidantProMobile = async (req, res) => {
     try {
-        await handleMulterUpload(req, res);
+        await handleMulterUpload(req, res, 'aidant-profile-pic');
+        const profilePicPath = getProfilePicPath(req);
         const {newUser, newProfileAidant, accessToken} = await createProfileAidantProCore(
             req,
             "PRO",
             generateEmailTokenMobile,
             sendVerificationEmailMobile,
-            req.body.source || "mobile"
+            req.body.source || "mobile",
+            profilePicPath
         );
 
         setAuthCookie(res, accessToken);
@@ -557,7 +561,8 @@ const createProfileAidantProMobile = async (req, res) => {
 
 const updateProfileAidant = async (req, res) => {
     try {
-        await handleMulterUpload(req, res);
+        await handleMulterUpload(req, res, 'aidant-profile-pic');
+
     } catch (uploadError) {
         // Allow updates without file upload
         if (uploadError.message !== "Profile Pic upload failed.") {
@@ -595,7 +600,8 @@ const updateProfileAidant = async (req, res) => {
         user.last_name = last_name || user.last_name;
         await user.save({transaction});
 
-        let profilePicPath = profileAidant.profile_pic;
+        const profilePicPath = getProfilePicPath(req);
+        /*let profilePicPath = profileAidant.profile_pic;
         if (req.file) {
             if (profileAidant.profile_pic) {
                 const oldPicPath = path.join(__dirname, "../assets", profileAidant.profile_pic);
@@ -603,8 +609,8 @@ const updateProfileAidant = async (req, res) => {
                     fs.unlinkSync(oldPicPath);
                 }
             }
-            profilePicPath = getProfilePicPath(req.file);
-        }
+            profilePicPath = getProfilePicPath(req);
+        }*/
 
         await profileAidant.update(
             {
