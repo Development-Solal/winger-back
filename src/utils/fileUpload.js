@@ -41,7 +41,6 @@ const generateFilename = (originalname, type = 'file', customId = null) => {
 const getRelativePath = (type) => {
     switch(type) {
         case 'aidant-profile-pic':
-        case 'aidant-pro-profile-pic':
             return 'aidant/profile_pics';
 
         case 'aide-profile-pic':
@@ -62,25 +61,38 @@ const getRelativePath = (type) => {
  * @param {string} customId - Custom ID (optional)
  * @returns {Promise<Object>} { url, path, filename }
  */
+
+
 const uploadToO2Switch = async (localFilePath, type, customId = null) => {
     try {
         const originalname = path.basename(localFilePath);
         const filename = generateFilename(originalname, type, customId);
         const relativePath = getRelativePath(type);
 
+        // Verify file exists
+        if (!fs.existsSync(localFilePath)) {
+            throw new Error(`Local file not found: ${localFilePath}`);
+        }
+
         const form = new FormData();
         form.append('path', relativePath);
         form.append('filename', filename);
         form.append('file', fs.createReadStream(localFilePath));
 
+        console.log('📤 Uploading to o2switch...', {
+            type,
+            original: originalname,
+            destination: `${relativePath}/${filename}`
+        });
+
         const response = await axios.post(O2SWITCH_UPLOAD_URL, form, {
-            headers: {
-                ...form.getHeaders()
-            },
+            headers: form.getHeaders(),
             maxContentLength: Infinity,
             maxBodyLength: Infinity,
             timeout: 60000
         });
+
+        console.log('✅ Upload successful:', response.data);
 
         return {
             url: response.data.url,
@@ -89,7 +101,11 @@ const uploadToO2Switch = async (localFilePath, type, customId = null) => {
         };
 
     } catch (error) {
-        console.error('o2switch upload error:', error.message);
+        console.error('❌ o2switch upload error:', {
+            message: error.message,
+            status: error.response?.status,
+            data: error.response?.data
+        });
         throw new Error(`Failed to upload to o2switch: ${error.message}`);
     }
 };

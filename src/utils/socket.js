@@ -13,7 +13,11 @@ const setupSocket = (server) => {
 
                 const allowedOrigins = [
                     'https://winger-front.devsolalco.workers.dev',
+                    'https://preprod.winger.fr',
                     'https://winger.fr',
+                    'https://dev.winger.fr', // Added
+                    'http://localhost:3000', // Added for development
+                    'http://localhost:5173', // Added for development
                     process.env.FRONTEND_URL,
                     process.env.FRONTEND_EXPO_URL,
                 ].filter(Boolean);

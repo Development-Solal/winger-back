@@ -28,11 +28,11 @@ const corsOptions = {
     origin: (origin, callback) => {
         // Allow requests with no origin (like mobile apps or Postman)
         if (!origin) return callback(null, true);
-
+        
         if (allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));
+            callback(null, false); // Fixed: don't throw error
         }
     },
     credentials: true,
@@ -76,7 +76,7 @@ app.get('/health', (req, res) => {
 
 app.get('/api/debug/logs', (req, res) => {
     try {
-        const fs = require('fs'); // Add this import at the top of the file
+        const fs = require('fs');
         const logPath = '/home/vacy0949/preprod.backend.winger.fr/app.log';
         const logs = fs.readFileSync(logPath, 'utf8');
         const lines = logs.split('\n').reverse().slice(0, 100).reverse(); // Last 100 lines
