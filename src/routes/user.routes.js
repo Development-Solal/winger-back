@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getUserById, getAidantByUser, getAidantProByUser } = require('../controllers/user.controller');
 const { sendContactForm } = require('../utils/mail');
-const authenticateToken = require('../middlewares/autheticationMiddleware'); 
+const authenticateToken = require('../middlewares/autheticationMiddleware');
 const { User } = require('../models');
 
 /**
@@ -12,7 +12,7 @@ const { User } = require('../models');
  *     summary: Retrive a user detail
  *     description: Returns the details of  a user
  *     tags:
- *      - User  
+ *      - User
  *     responses:
  *       200:
  *         description: Success
@@ -26,7 +26,7 @@ router.get('/getUserById/:userId', authenticateToken, getUserById);
  *     summary: Retrive an aidant detail
  *     description: Returns the details of an aidant
  *     tags:
- *      - User  
+ *      - User
  *     responses:
  *       200:
  *         description: Success
@@ -40,7 +40,7 @@ router.get('/getAidantByUser/:userId', authenticateToken, getAidantByUser);
  *     summary: Retrive an aidant pro detail
  *     description: Returns the details of an aidant pro
  *     tags:
- *      - User  
+ *      - User
  *     responses:
  *       200:
  *         description: Success
@@ -55,7 +55,7 @@ router.get('/getAidantProByUser/:userId', authenticateToken, getAidantProByUser)
  *     summary: send contact form
  *     description: Send contact form
  *     tags:
- *      - User  
+ *      - User
  *     responses:
  *       200:
  *         description: Success
@@ -69,16 +69,16 @@ router.post('/sendContactForm', sendContactForm);
  *     summary: Update user push notification token
  *     description: Updates the user's push notification token for mobile notifications
  *     tags:
- *      - User  
+ *      - User
  *     responses:
  *       200:
  *         description: Success
  */
 router.post('/update-push-token', async (req, res)=> {
     try {
-        const {userId, fcmToken} = req.body;
+        const {userId, expoPushToken} = req.body;
 
-        if(!userId || !fcmToken){
+        if(!userId || !expoPushToken){
             return res.status(400).json({
                 error: 'Missing required fields: userId and expoPushToken'
             });
@@ -88,7 +88,7 @@ router.post('/update-push-token', async (req, res)=> {
 
         const [updatedCount] = await User.update(
             {
-                expo_push_token: fcmToken,
+                expo_push_token: expoPushToken,
                 last_token_update: new Date()
             },
             {

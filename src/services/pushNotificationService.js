@@ -44,6 +44,7 @@ const sendExpoNotification = async (expoPushToken, title, body, data = {}) => {
     }
 };
 
+
 const sendFirebaseNotification = async (fcmToken, title, body, data = {}) => {
     try {
         if (!fcmToken || typeof fcmToken !== 'string' || fcmToken.length < 100) {
@@ -96,6 +97,7 @@ const sendFirebaseNotification = async (fcmToken, title, body, data = {}) => {
         console.error('❌ Error sending Firebase push notification:', error);
         console.error('Error code:', error.code);
         console.error('Error message:', error.message);
+        // Handle specific error codes
         if (error.code === 'messaging/invalid-registration-token' ||
             error.code === 'messaging/registration-token-not-registered') {
             console.error('🔴 Token is invalid or expired. Should be removed from database.');
@@ -159,7 +161,7 @@ const sendBulkPushNotifications = async (tokens, title, body, data = {}) => {
         try {
             const message = {
                 tokens: fcmTokens,
-                notification: { title, body },
+                notification: {title, body},
                 data: {
                     type: data.type || 'message',
                     chatId: data.chatId?.toString() || '',
