@@ -172,7 +172,7 @@ const login = async (req, res) => {
         const subscription = await Subscription.findOne({
             where: {
                 aidant_id: user.id,
-                // status: 'active'
+                status: 'active'
             },
             attributes: ['id', 'plan_id', 'start_time', 'status'] // customize as needed
         });

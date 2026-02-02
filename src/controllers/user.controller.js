@@ -16,12 +16,12 @@ const getUserById = async (req, res) => {
       include: [
         {
           model: ProfileAidant,
-          attributes: ["profile_type_id","profile_pic", "active"],
+          attributes: ["id", "profile_type_id", "profile_pic", "active"], // Added ID for mapping
           include: [
             {
               model: Subscription,
-              as: "subscription", // match the alias
-              attributes: ["status", "start_time", "next_billing_time"],
+              as: "subscription",
+              attributes: ["id", "status", "start_time", "next_billing_time", "createdAt"],
               where: {
                 [Op.or]: [
                   { status: "active" },
@@ -36,13 +36,28 @@ const getUserById = async (req, res) => {
           ],
         },
       ],
+      // Sorts so 'active' (A) comes before 'cancelled' (C), 
+      // and the most recently created record is first.
+      order: [
+        [{ model: ProfileAidant }, { model: Subscription, as: 'subscription' }, 'status', 'ASC'],
+        [{ model: ProfileAidant }, { model: Subscription, as: 'subscription' }, 'createdAt', 'DESC']
+      ]
     });
 
     if (!user) {
       return res.status(404).json({ message: "User not found." });
     }
 
-    res.status(200).json(user);
+    // --- DATA CLEANUP ---
+    // Since an Aidant might technically have multiple matching records (like in your screenshot),
+    // we ensure the response returns the single most relevant subscription object.
+    const userJson = user.toJSON();
+    if (userJson.ProfileAidant && Array.isArray(userJson.ProfileAidant.subscription)) {
+      // Pick the first one (which is 'active' thanks to our 'order' clause)
+      userJson.ProfileAidant.subscription = userJson.ProfileAidant.subscription[0] || null;
+    }
+
+    res.status(200).json(userJson);
   } catch (error) {
     console.error("Error fetching user:", error);
     res.status(500).json({ message: "Server error." });

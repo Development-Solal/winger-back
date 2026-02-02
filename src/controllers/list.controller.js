@@ -251,22 +251,60 @@ const getAllCommunes = async (req, res) => {
   try {
     const { page = 1, page_size = 50, search = "" } = req.query;
 
-    if (search && search.length >= 2) { // Only search if at least 2 chars
+    if (search && search.length >= 1) {
       // Normalize the search term
-      const normalizedSearch = search
+      let normalizedSearch = search
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[\s\-']/g, '');
+        .trim();
 
-      // Fetch communes with a broad database filter first (first 2 chars of original search)
-      const broadSearch = search.substring(0, 2);
+      // Detect if searching for saint/sainte variants
+      const searchingForSaint = /^(saint|st)[\s\-]/i.test(normalizedSearch);
+      const searchingForSainte = /^(sainte|ste)[\s\-]/i.test(normalizedSearch);
+
+      // Build more specific search patterns based on input
+      let dbSearchPatterns = [];
+      
+      if (searchingForSaint || searchingForSainte) {
+        // Extract the part after "saint/st" - remove the separator too
+        let afterSaint = normalizedSearch
+          .replace(/^(saint|st|sainte|ste)[\s\-]*/i, ''); // Remove separator with *
+        
+        if (afterSaint.length > 0) {
+          // Search with the letter after saint/st
+          dbSearchPatterns = [
+            { name: { [Sequelize.Op.iLike]: `Saint-${afterSaint}%` } },
+            { name: { [Sequelize.Op.iLike]: `Saint ${afterSaint}%` } },
+            { name: { [Sequelize.Op.iLike]: `St-${afterSaint}%` } },
+            { name: { [Sequelize.Op.iLike]: `St ${afterSaint}%` } },
+            { name: { [Sequelize.Op.iLike]: `Sainte-${afterSaint}%` } },
+            { name: { [Sequelize.Op.iLike]: `Sainte ${afterSaint}%` } },
+            { name: { [Sequelize.Op.iLike]: `Ste-${afterSaint}%` } },
+            { name: { [Sequelize.Op.iLike]: `Ste ${afterSaint}%` } }
+          ];
+        } else {
+          // Just "st" or "saint" or "st-" or "saint-" - get first 2000
+          dbSearchPatterns = [
+            { name: { [Sequelize.Op.iLike]: `Saint%` } },
+            { name: { [Sequelize.Op.iLike]: `St %` } },
+            { name: { [Sequelize.Op.iLike]: `St-%` } },
+            { name: { [Sequelize.Op.iLike]: `Sainte%` } },
+            { name: { [Sequelize.Op.iLike]: `Ste %` } },
+            { name: { [Sequelize.Op.iLike]: `Ste-%` } }
+          ];
+        }
+      } else {
+        // Normal search
+        const broadSearch = search.substring(0, 2);
+        dbSearchPatterns = [
+          { name: { [Sequelize.Op.iLike]: `${broadSearch}%` } }
+        ];
+      }
       
       const allCommunes = await ListCommune.findAll({
         where: {
-          name: {
-            [Sequelize.Op.iLike]: `${broadSearch}%`,
-          },
+          [Sequelize.Op.or]: dbSearchPatterns
         },
         limit: 2000,
         order: [['name', 'ASC']],
@@ -274,13 +312,26 @@ const getAllCommunes = async (req, res) => {
 
       // Filter based on normalized names
       const filtered = allCommunes.filter(commune => {
-        const normalizedName = commune.name
+        let normalizedName = commune.name
           .toLowerCase()
           .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/[\s\-']/g, '');
+          .replace(/[\u0300-\u036f]/g, '');
         
-        return normalizedName.startsWith(normalizedSearch);
+        // Normalize all saint/st variations to the same format for comparison
+        // Replace with a consistent separator pattern
+        let compareSearch = normalizedSearch
+          .replace(/^saint[\s\-]*/i, 'saint-')
+          .replace(/^st[\s\-]*/i, 'saint-')
+          .replace(/^sainte[\s\-]*/i, 'sainte-')
+          .replace(/^ste[\s\-]*/i, 'sainte-');
+        
+        let compareName = normalizedName
+          .replace(/^saint[\s\-]*/i, 'saint-')
+          .replace(/^st[\s\-]*/i, 'saint-')
+          .replace(/^sainte[\s\-]*/i, 'sainte-')
+          .replace(/^ste[\s\-]*/i, 'sainte-');
+        
+        return compareName.startsWith(compareSearch);
       });
 
       const totalCount = filtered.length;
