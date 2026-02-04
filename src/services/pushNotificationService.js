@@ -2,7 +2,7 @@
 const admin = require('firebase-admin');
 const {NotificationLog} = require("../models");
 
-// Initialize Firebase Admin SDK with explicit project ID
+// Initialize Firebase Admin SDK
 const initializeFirebase = () => {
     if (admin.apps.length > 0) {
         console.log('✅ Firebase already initialized');
@@ -10,90 +10,45 @@ const initializeFirebase = () => {
     }
 
     console.log('🔥 Initializing Firebase Admin SDK...');
-
-    // Set GOOGLE_CLOUD_PROJECT environment variable (Firebase SDK fallback)
+    
     const projectId = process.env.FIREBASE_PROJECT_ID || 'winger-13';
-    process.env.GOOGLE_CLOUD_PROJECT = projectId;
-    process.env.GCLOUD_PROJECT = projectId;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    
+    console.log('Environment variables check:', {
+        hasProjectId: !!projectId,
+        projectId: projectId,
+        hasPrivateKey: !!privateKey,
+        privateKeyLength: privateKey?.length || 0,
+        hasClientEmail: !!clientEmail,
+        clientEmail: clientEmail
+    });
 
-    console.log('📋 Project ID:', projectId);
+    if (!privateKey || !clientEmail) {
+        console.error('❌ Missing required Firebase credentials');
+        console.error('Required: FIREBASE_PRIVATE_KEY and FIREBASE_CLIENT_EMAIL');
+        throw new Error('Firebase credentials not configured');
+    }
 
     try {
-        let serviceAccountData;
-
-        // Debug: Check what's available
-        console.log('🔍 Environment check:', {
-            FIREBASE_SERVICE_ACCOUNT_length: process.env.FIREBASE_SERVICE_ACCOUNT?.length || 0,
-            FIREBASE_SERVICE_ACCOUNT_first50: process.env.FIREBASE_SERVICE_ACCOUNT?.substring(0, 50) || 'NOT SET',
-            FIREBASE_PRIVATE_KEY_set: !!process.env.FIREBASE_PRIVATE_KEY,
-            FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL || 'NOT SET'
-        });
-
-        // Option 1: Full JSON from environment variable
-        if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-            console.log('📦 Loading credentials from FIREBASE_SERVICE_ACCOUNT');
-
-            try {
-                serviceAccountData = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-                console.log('✅ JSON parsed successfully');
-            } catch (parseError) {
-                console.error('❌ Failed to parse FIREBASE_SERVICE_ACCOUNT JSON:', parseError.message);
-                console.error('First 200 chars:', process.env.FIREBASE_SERVICE_ACCOUNT?.substring(0, 200));
-                throw new Error('Invalid FIREBASE_SERVICE_ACCOUNT JSON format');
-            }
-        }
-        // Option 2: Individual environment variables
-        else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
-            console.log('🔑 Loading credentials from individual environment variables');
-            serviceAccountData = {
-                type: 'service_account',
-                project_id: projectId,
-                private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-                client_email: process.env.FIREBASE_CLIENT_EMAIL,
-            };
-        }
-        // Option 3: Local file (development only)
-        else {
-            console.log('📁 Attempting to load local firebase-service-account.json');
-            serviceAccountData = require('../../firebase-service-account.json');
-        }
-
-        // Ensure project_id is set in the service account data
-        if (!serviceAccountData.project_id) {
-            serviceAccountData.project_id = projectId;
-        }
-
-        console.log('🔐 Service account details:', {
-            type: serviceAccountData.type,
-            hasPrivateKey: !!serviceAccountData.private_key,
-            privateKeyLength: serviceAccountData.private_key?.length || 0,
-            privateKeyStart: serviceAccountData.private_key?.substring(0, 30) || 'MISSING',
-            hasClientEmail: !!serviceAccountData.client_email,
-            clientEmail: serviceAccountData.client_email,
-            hasProjectId: !!serviceAccountData.project_id,
-            projectId: serviceAccountData.project_id,
-            hasPrivateKeyId: !!serviceAccountData.private_key_id
-        });
-
-        // Initialize with the service account
+        // Format the private key correctly
+        const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
+        
         admin.initializeApp({
-            credential: admin.credential.cert(serviceAccountData),
-            projectId: serviceAccountData.project_id
+            credential: admin.credential.cert({
+                projectId: projectId,
+                privateKey: formattedPrivateKey,
+                clientEmail: clientEmail,
+            }),
+            projectId: projectId
         });
-
+        
         console.log('✅ Firebase Admin SDK initialized successfully');
-        console.log('✅ Project ID confirmed:', serviceAccountData.project_id);
-
+        console.log('✅ Using project:', projectId);
+        
     } catch (error) {
         console.error('❌ Firebase initialization failed:', error.message);
-        console.error('Available env vars:', {
-            FIREBASE_SERVICE_ACCOUNT: !!process.env.FIREBASE_SERVICE_ACCOUNT,
-            FIREBASE_PRIVATE_KEY: !!process.env.FIREBASE_PRIVATE_KEY,
-            FIREBASE_CLIENT_EMAIL: !!process.env.FIREBASE_CLIENT_EMAIL,
-            FIREBASE_PROJECT_ID: !!process.env.FIREBASE_PROJECT_ID,
-            GOOGLE_CLOUD_PROJECT: !!process.env.GOOGLE_CLOUD_PROJECT
-        });
-        throw new Error(`Firebase initialization failed: ${error.message}`);
+        throw error;
     }
 };
 
