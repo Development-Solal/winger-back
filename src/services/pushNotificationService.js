@@ -11,60 +11,57 @@ const initializeFirebase = () => {
 
     console.log('🔥 Initializing Firebase Admin SDK...');
 
-    // ALWAYS set project ID explicitly from environment or fallback
+    // Set GOOGLE_CLOUD_PROJECT environment variable (Firebase SDK fallback)
     const projectId = process.env.FIREBASE_PROJECT_ID || 'winger-13';
+    process.env.GOOGLE_CLOUD_PROJECT = projectId;
+    process.env.GCLOUD_PROJECT = projectId;
+
     console.log('📋 Project ID:', projectId);
 
     try {
+        let serviceAccountData;
+
         // Option 1: Full JSON from environment variable
         if (process.env.FIREBASE_SERVICE_ACCOUNT) {
             console.log('📦 Loading credentials from FIREBASE_SERVICE_ACCOUNT');
-            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-
-            admin.initializeApp({
-                credential: admin.credential.cert({
-                    projectId: projectId,
-                    privateKey: serviceAccount.private_key,
-                    clientEmail: serviceAccount.client_email,
-                }),
-                projectId: projectId  // Explicitly set project ID
-            });
-
-            console.log('✅ Firebase initialized with service account JSON');
-            return;
+            serviceAccountData = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
         }
-
         // Option 2: Individual environment variables
-        if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+        else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
             console.log('🔑 Loading credentials from individual environment variables');
-
-            admin.initializeApp({
-                credential: admin.credential.cert({
-                    projectId: projectId,
-                    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-                }),
-                projectId: projectId  // Explicitly set project ID
-            });
-
-            console.log('✅ Firebase initialized with individual credentials');
-            return;
+            serviceAccountData = {
+                type: 'service_account',
+                project_id: projectId,
+                private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+                client_email: process.env.FIREBASE_CLIENT_EMAIL,
+            };
+        }
+        // Option 3: Local file (development only)
+        else {
+            console.log('📁 Attempting to load local firebase-service-account.json');
+            serviceAccountData = require('../../firebase-service-account.json');
         }
 
-        // Option 3: Local file (development only)
-        console.log('📁 Attempting to load local firebase-service-account.json');
-        const serviceAccount = require('../../firebase-service-account.json');
+        // Ensure project_id is set in the service account data
+        if (!serviceAccountData.project_id) {
+            serviceAccountData.project_id = projectId;
+        }
 
-        admin.initializeApp({
-            credential: admin.credential.cert({
-                projectId: projectId,
-                privateKey: serviceAccount.private_key,
-                clientEmail: serviceAccount.client_email,
-            }),
-            projectId: projectId  // Explicitly set project ID
+        console.log('🔐 Service account details:', {
+            hasPrivateKey: !!serviceAccountData.private_key,
+            hasClientEmail: !!serviceAccountData.client_email,
+            hasProjectId: !!serviceAccountData.project_id,
+            projectId: serviceAccountData.project_id
         });
 
-        console.log('⚠️ Firebase initialized with local file (development mode)');
+        // Initialize with the service account
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccountData),
+            projectId: serviceAccountData.project_id
+        });
+
+        console.log('✅ Firebase Admin SDK initialized successfully');
+        console.log('✅ Project ID confirmed:', serviceAccountData.project_id);
 
     } catch (error) {
         console.error('❌ Firebase initialization failed:', error.message);
@@ -72,7 +69,8 @@ const initializeFirebase = () => {
             FIREBASE_SERVICE_ACCOUNT: !!process.env.FIREBASE_SERVICE_ACCOUNT,
             FIREBASE_PRIVATE_KEY: !!process.env.FIREBASE_PRIVATE_KEY,
             FIREBASE_CLIENT_EMAIL: !!process.env.FIREBASE_CLIENT_EMAIL,
-            FIREBASE_PROJECT_ID: !!process.env.FIREBASE_PROJECT_ID
+            FIREBASE_PROJECT_ID: !!process.env.FIREBASE_PROJECT_ID,
+            GOOGLE_CLOUD_PROJECT: !!process.env.GOOGLE_CLOUD_PROJECT
         });
         throw new Error(`Firebase initialization failed: ${error.message}`);
     }
