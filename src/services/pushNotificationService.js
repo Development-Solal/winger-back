@@ -1,30 +1,67 @@
+// backend/src/services/pushNotificationService.js
 const admin = require('firebase-admin');
-const {NotificationLog} = require("../models");
 
 // Initialize Firebase Admin SDK using environment variables
 if (!admin.apps.length) {
-    console.log('No admin apps configured');
-    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-            projectId: process.env.FIREBASE_PROJECT_ID || 'winger-13'
-        });
-    }
+    console.log('🔥 Initializing Firebase Admin SDK...');
 
-    else if (process.env.FIREBASE_PRIVATE_KEY) {
-        admin.initializeApp({
-            credential: admin.credential.cert({
-                projectId: process.env.FIREBASE_PROJECT_ID,
-                privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-                clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            }),
-            projectId: process.env.FIREBASE_PROJECT_ID || 'winger-13'
-        });
+    // Debug: Check which environment variables are set
+    console.log('Environment check:', {
+        hasServiceAccount: !!process.env.FIREBASE_SERVICE_ACCOUNT,
+        hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+        hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
+        hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
+        projectId: process.env.FIREBASE_PROJECT_ID
+    });
+
+    // Option 1: If you store the entire JSON as a single environment variable
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        try {
+            console.log('📋 Using FIREBASE_SERVICE_ACCOUNT environment variable');
+            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount),
+                projectId: serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID || 'winger-13'
+            });
+            console.log('✅ Firebase initialized with service account JSON');
+        } catch (error) {
+            console.error('❌ Failed to parse FIREBASE_SERVICE_ACCOUNT:', error.message);
+            throw error;
+        }
+    }
+    // Option 2: If you store individual fields as separate environment variables
+    else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PROJECT_ID) {
+        try {
+            console.log('🔑 Using individual Firebase environment variables');
+
+            const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+            const projectId = process.env.FIREBASE_PROJECT_ID;
+            const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+
+            console.log('Credentials check:', {
+                privateKeyLength: privateKey.length,
+                projectId: projectId,
+                clientEmail: clientEmail
+            });
+
+            admin.initializeApp({
+                credential: admin.credential.cert({
+                    projectId: projectId,
+                    privateKey: privateKey,
+                    clientEmail: clientEmail,
+                }),
+                projectId: projectId
+            });
+            console.log('✅ Firebase initialized with individual credentials');
+        } catch (error) {
+            console.error('❌ Failed to initialize with individual credentials:', error.message);
+            throw error;
+        }
     }
     // Fallback for local development
     else {
         try {
+            console.log('📁 Attempting to use local firebase-service-account.json file');
             const serviceAccount = require('../../firebase-service-account.json');
             admin.initializeApp({
                 credential: admin.credential.cert(serviceAccount),
@@ -32,8 +69,11 @@ if (!admin.apps.length) {
             });
             console.log('⚠️  Using local firebase-service-account.json file');
         } catch (error) {
-            console.error('❌ Firebase initialization failed. No credentials found.', error.toString());
-            throw new Error('Firebase credentials not configured');
+            console.error('❌ Firebase initialization failed. No credentials found.');
+            console.error('Please set one of the following:');
+            console.error('1. FIREBASE_SERVICE_ACCOUNT (entire JSON as string)');
+            console.error('2. FIREBASE_PRIVATE_KEY, FIREBASE_CLIENT_EMAIL, and FIREBASE_PROJECT_ID');
+            throw new Error('Firebase credentials not configured: ' + error.message);
         }
     }
 }
@@ -67,6 +107,7 @@ const sendExpoNotification = async (expoPushToken, title, body, data = {}) => {
         });
 
         return await response.json();
+
     } catch (error) {
         console.error('❌ Error sending Expo push notification:', error);
         throw error;
@@ -127,17 +168,6 @@ const sendFirebaseNotification = async (fcmToken, title, body, data = {}) => {
         console.error('❌ Error sending Firebase push notification:', error);
         console.error('Error code:', error.code);
         console.error('Error message:', error.message);
-
-        await NotificationLog.create({
-            recipient_id: data.senderId,
-            sender_id: data.senderId,
-            status: 'failed',
-            token: fcmToken,
-            message_title: title,
-            message_text: body,
-            notification_type: 'firebase',
-            error_message: `${error?.code}: ${error?.message}`
-        });
 
         if (error.code === 'messaging/invalid-registration-token' ||
             error.code === 'messaging/registration-token-not-registered') {
