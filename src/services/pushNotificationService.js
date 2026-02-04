@@ -1,7 +1,9 @@
 const admin = require('firebase-admin');
+const {NotificationLog} = require("../models");
 
 // Initialize Firebase Admin SDK using environment variables
 if (!admin.apps.length) {
+    console.log('No admin apps configured');
     if (process.env.FIREBASE_SERVICE_ACCOUNT) {
         const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
         admin.initializeApp({
@@ -125,6 +127,17 @@ const sendFirebaseNotification = async (fcmToken, title, body, data = {}) => {
         console.error('❌ Error sending Firebase push notification:', error);
         console.error('Error code:', error.code);
         console.error('Error message:', error.message);
+
+        await NotificationLog.create({
+            recipient_id: data.senderId,
+            sender_id: data.senderId,
+            status: 'failed',
+            token: fcmToken,
+            message_title: title,
+            message_text: body,
+            notification_type: 'firebase',
+            error_message: `${error?.code}: ${error?.message}`
+        });
 
         if (error.code === 'messaging/invalid-registration-token' ||
             error.code === 'messaging/registration-token-not-registered') {
