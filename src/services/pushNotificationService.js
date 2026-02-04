@@ -21,10 +21,26 @@ const initializeFirebase = () => {
     try {
         let serviceAccountData;
 
+        // Debug: Check what's available
+        console.log('🔍 Environment check:', {
+            FIREBASE_SERVICE_ACCOUNT_length: process.env.FIREBASE_SERVICE_ACCOUNT?.length || 0,
+            FIREBASE_SERVICE_ACCOUNT_first50: process.env.FIREBASE_SERVICE_ACCOUNT?.substring(0, 50) || 'NOT SET',
+            FIREBASE_PRIVATE_KEY_set: !!process.env.FIREBASE_PRIVATE_KEY,
+            FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL || 'NOT SET'
+        });
+
         // Option 1: Full JSON from environment variable
         if (process.env.FIREBASE_SERVICE_ACCOUNT) {
             console.log('📦 Loading credentials from FIREBASE_SERVICE_ACCOUNT');
-            serviceAccountData = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+            try {
+                serviceAccountData = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+                console.log('✅ JSON parsed successfully');
+            } catch (parseError) {
+                console.error('❌ Failed to parse FIREBASE_SERVICE_ACCOUNT JSON:', parseError.message);
+                console.error('First 200 chars:', process.env.FIREBASE_SERVICE_ACCOUNT?.substring(0, 200));
+                throw new Error('Invalid FIREBASE_SERVICE_ACCOUNT JSON format');
+            }
         }
         // Option 2: Individual environment variables
         else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
@@ -48,10 +64,15 @@ const initializeFirebase = () => {
         }
 
         console.log('🔐 Service account details:', {
+            type: serviceAccountData.type,
             hasPrivateKey: !!serviceAccountData.private_key,
+            privateKeyLength: serviceAccountData.private_key?.length || 0,
+            privateKeyStart: serviceAccountData.private_key?.substring(0, 30) || 'MISSING',
             hasClientEmail: !!serviceAccountData.client_email,
+            clientEmail: serviceAccountData.client_email,
             hasProjectId: !!serviceAccountData.project_id,
-            projectId: serviceAccountData.project_id
+            projectId: serviceAccountData.project_id,
+            hasPrivateKeyId: !!serviceAccountData.private_key_id
         });
 
         // Initialize with the service account
