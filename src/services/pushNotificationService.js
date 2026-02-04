@@ -4,11 +4,6 @@ const {NotificationLog} = require("../models");
 
 // Initialize Firebase Admin SDK
 const initializeFirebase = () => {
-    if (admin.apps.length > 0) {
-        console.log('✅ Firebase already initialized');
-        return;
-    }
-
     console.log('🔥 Initializing Firebase Admin SDK...');
     
     const projectId = process.env.FIREBASE_PROJECT_ID || 'winger-13';
@@ -23,6 +18,14 @@ const initializeFirebase = () => {
         hasClientEmail: !!clientEmail,
         clientEmail: clientEmail
     });
+
+    // If Firebase was already initialized (possibly incorrectly), delete it and re-initialize
+    if (admin.apps.length > 0) {
+        console.log('⚠️  Firebase already initialized, re-initializing with environment variables...');
+        admin.apps.forEach(app => {
+            app.delete().catch(err => console.error('Error deleting app:', err));
+        });
+    }
 
     if (!privateKey || !clientEmail) {
         console.error('❌ Missing required Firebase credentials');
