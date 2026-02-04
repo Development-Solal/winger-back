@@ -19,11 +19,26 @@ if (!admin.apps.length) {
         try {
             console.log('📋 Using FIREBASE_SERVICE_ACCOUNT environment variable');
             const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount),
-                projectId: serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID || 'winger-13'
+
+            // Extract project ID explicitly
+            const projectId = serviceAccount.project_id || 'winger-13';
+
+            console.log('Service account details:', {
+                hasPrivateKey: !!serviceAccount.private_key,
+                hasClientEmail: !!serviceAccount.client_email,
+                projectId: projectId
             });
-            console.log('✅ Firebase initialized with service account JSON');
+
+            // Initialize with explicit project ID in BOTH places
+            admin.initializeApp({
+                credential: admin.credential.cert({
+                    projectId: projectId,
+                    privateKey: serviceAccount.private_key,
+                    clientEmail: serviceAccount.client_email,
+                }),
+                projectId: projectId
+            });
+            console.log('✅ Firebase initialized successfully with project:', projectId);
         } catch (error) {
             console.error('❌ Failed to parse FIREBASE_SERVICE_ACCOUNT:', error.message);
             throw error;
@@ -106,8 +121,8 @@ const sendExpoNotification = async (expoPushToken, title, body, data = {}) => {
             body: JSON.stringify(message),
         });
 
-        return await response.json();
-
+        const result = await response.json();
+        return result;
     } catch (error) {
         console.error('❌ Error sending Expo push notification:', error);
         throw error;
