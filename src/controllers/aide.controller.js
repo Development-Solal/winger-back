@@ -73,9 +73,9 @@ const handleMulterUpload = (req, res, fileType) => {
                 return reject({ status: 400, message: "File upload failed." });
             }
 
-            // if (!req.file) {
-            //     return reject({ status: 400, message: "No file uploaded." });
-            // }
+            if (!req.file) {
+                return reject({ status: 400, message: "No file uploaded." });
+            }
 
             try {
                 console.log('📤 Uploading to o2switch...', {
@@ -128,8 +128,13 @@ const createProfileAide = async (req, res) => {
         const transaction = await sequelize.transaction();
 
         try {
-            await handleMulterUpload(req, res, 'aide-profile-pic');
-            const profilePicPath = getProfilePicPath(req);
+            let profilePicPath = null;
+            if(req.file){
+                 await handleMulterUpload(req, res, 'aide-profile-pic');
+                profilePicPath = getProfilePicPath(req);
+            }
+           
+           
             const profileData = extractProfileData(req);
             const aidant = await validateAidant(profileData.userEmail, transaction);
 
