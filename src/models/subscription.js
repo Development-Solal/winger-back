@@ -42,6 +42,11 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: true,
         },
+        payment_method:{
+            type: DataTypes.ENUM('paypal','apple','stripe','google'),
+            allowNull: false,
+            defaultValue: 'paypal',
+        }
     },
     {
       sequelize,
