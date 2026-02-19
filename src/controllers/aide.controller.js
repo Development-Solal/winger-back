@@ -123,51 +123,52 @@ const convertToNull = (value) => (value === "" ? null : value);
 
 // Create a new ProfileAide
 const createProfileAide = async (req, res) => {
-    console.log("inside create profile aide" , req);
+    
+    // ✅ Always parse the request first (file is optional)
+    await new Promise((resolve, reject) => {
+        upload(req, res, (err) => {
+            if (err) return reject({ status: 400, message: "File upload failed." });
+            resolve(); // resolves even if no file was sent
+        });
+    });
 
-        const transaction = await sequelize.transaction();
+    const transaction = await sequelize.transaction();
+    try {
+        let profilePicPath = null;
 
-        try {
-            let profilePicPath = null;
-            if(req.file){
-                 await handleMulterUpload(req, res, 'aide-profile-pic');
-                profilePicPath = getProfilePicPath(req);
+        // ✅ Only upload if a file was actually included
+        if (req.file) {
+            try {
+                const result = await uploadToO2Switch(req.file.path, 'aide-profile-pic');
+                await cleanupTempFile(req.file.path);
+                profilePicPath = result.path;
+            } catch (uploadError) {
+                await cleanupTempFile(req.file.path);
+                return res.status(500).json({ message: "Upload to storage failed" });
             }
-           
-           
-            const profileData = extractProfileData(req);
-            const aidant = await validateAidant(profileData.userEmail, transaction);
-
-            await validateAideLimit(aidant, profileData.gdpr_aide_id, transaction);
-
-            const profileNumber = await generateProfileNumber(transaction);
-            //const profilePicPath = req.file ? `aide/profile_pics/${req.file.filename}` : null;
-            const allRequired = await checkRequiredAcceptance(aidant, profileData.gdpr_aide_id, transaction);
-            console.log("allRequired",allRequired);
-
-            const newProfileAide = await createProfileAideRecord(
-                profileData,
-                aidant.id,
-                profileNumber,
-                profilePicPath,
-                allRequired,
-                transaction
-            );
-
-            await setProfileRelations(newProfileAide, profileData, transaction);
-            await createFutureMoitieRecord(newProfileAide.id, profileData, transaction);
-            console.log("profile data", profileData);
-            await handleGdprConsent(newProfileAide, aidant, profileData.gdpr_aide_id, profileData.source, transaction);
-
-            await transaction.commit();
-            res.status(201).json(newProfileAide);
-
-        } catch (error) {
-            if (transaction.finished !== "rollback") {
-                await transaction.rollback();
-            }
-            handleError(error, res);
         }
+
+        // req.body is now always available whether or not a file was sent
+        const profileData = extractProfileData(req);
+        const aidant = await validateAidant(profileData.userEmail, transaction);
+        await validateAideLimit(aidant, profileData.gdpr_aide_id, transaction);
+        const profileNumber = await generateProfileNumber(transaction);
+        const allRequired = await checkRequiredAcceptance(aidant, profileData.gdpr_aide_id, transaction);
+
+        const newProfileAide = await createProfileAideRecord(
+            profileData, aidant.id, profileNumber, profilePicPath, allRequired, transaction
+        );
+        await setProfileRelations(newProfileAide, profileData, transaction);
+        await createFutureMoitieRecord(newProfileAide.id, profileData, transaction);
+        await handleGdprConsent(newProfileAide, aidant, profileData.gdpr_aide_id, profileData.source, transaction);
+
+        await transaction.commit();
+        res.status(201).json(newProfileAide);
+
+    } catch (error) {
+        if (transaction.finished !== "rollback") await transaction.rollback();
+        handleError(error, res);
+    }
 };
 
 // ============ Helper Functions ============
