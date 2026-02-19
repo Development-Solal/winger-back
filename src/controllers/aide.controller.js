@@ -73,9 +73,9 @@ const handleMulterUpload = (req, res, fileType) => {
                 return reject({ status: 400, message: "File upload failed." });
             }
 
-            if (!req.file) {
-                return reject({ status: 400, message: "No file uploaded." });
-            }
+            // if (!req.file) {
+            //     return reject({ status: 400, message: "No file uploaded." });
+            // }
 
             try {
                 console.log('📤 Uploading to o2switch...', {
