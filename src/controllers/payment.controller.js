@@ -89,7 +89,9 @@ const generateAppleServerJWT = () => {
     aud: 'appstoreconnect-v1',
     bid: process.env.APPLE_BUNDLE_ID,
   };
-  const privateKeyPath = path.join(__dirname, '../config', process.env.APPLE_KEY_FILENAME || 'AuthKey.p8');
+  const privateKeyPath = process.env.APPLE_KEY_FILENAME
+  ? path.resolve(process.env.APPLE_KEY_FILENAME)        
+  : path.join(__dirname, '../config', 'AuthKey.p8');
   const privateKey = fs.readFileSync(privateKeyPath, 'utf8');
   return jwt.sign(payload, privateKey, {
     algorithm: 'ES256',
