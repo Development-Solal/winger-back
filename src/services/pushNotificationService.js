@@ -148,20 +148,20 @@ const sendFirebaseNotification = async (fcmToken, title, body, data = {}) => {
         console.error('Error code:', error.code);
         console.error('Error message:', error.message);
 
-        try {
-            await NotificationLog.create({
-                recipient_id: data.senderId,
-                sender_id: data.senderId,
-                status: 'failed',
-                token: fcmToken,
-                message_title: title,
-                message_text: body,
-                notification_type: 'firebase',
-                error_message: `${error?.code}: ${error?.message}`
-            });
-        } catch (logError) {
-            console.error('Failed to log notification error:', logError);
-        }
+        // try {
+        //     await NotificationLog.create({
+        //         recipient_id: data.senderId,
+        //         sender_id: data.senderId,
+        //         status: 'failed',
+        //         token: fcmToken,
+        //         message_title: title,
+        //         message_text: body,
+        //         notification_type: 'firebase',
+        //         error_message: `${error?.code}: ${error?.message}`
+        //     });
+        // } catch (logError) {
+        //     console.error('Failed to log notification error:', logError);
+        // }
 
         if (error.code === 'messaging/invalid-registration-token' ||
             error.code === 'messaging/registration-token-not-registered') {
