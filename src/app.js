@@ -17,12 +17,12 @@ app.use(express.urlencoded({ extended: true }));
 // CORS configuration - whitelist your Cloudflare frontend
 const allowedOrigins = [
     'https://winger-front.devsolalco.workers.dev',
-    'https://winger-front-prod.pages.dev',
     'https://preprod.winger.fr',
     'https://winger.fr',
     'http://localhost:3000',
     'http://localhost:5173',
-    'https://dev.winger.fr'
+    'https://dev.winger.fr',
+    'https://winger-front-prod.pages.dev'
 ];
 
 const corsOptions = {
