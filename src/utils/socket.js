@@ -13,6 +13,7 @@ const setupSocket = (server) => {
 
                 const allowedOrigins = [
                     'https://winger-front.devsolalco.workers.dev',
+                    'https://winger-front-prod.pages.dev',
                     'https://preprod.winger.fr',
                     'https://winger.fr',
                     'https://dev.winger.fr', // Added
