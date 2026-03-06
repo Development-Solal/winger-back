@@ -271,7 +271,7 @@ const setAuthCookie = (res, accessToken) => {
     res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "Strict",
+        sameSite: "None",
         maxAge: 4 * 60 * 60 * 1000,
     });
 };
@@ -457,7 +457,7 @@ const createProfileAidant = async (req, res) => {
         await handleMulterUpload(req, res, 'aidant-profile-pic');
         const profilePicPath = getProfilePicPath(req);
 
-       // await handleMulterUpload(req, res);
+        // await handleMulterUpload(req, res);
         const {newUser, newProfileAidant, accessToken} = await createProfileAidantCore(
             req,
             "PAR",

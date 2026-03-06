@@ -54,7 +54,7 @@ const register = async (req, res) => {
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production', // Enable in production
-            sameSite: 'Strict',
+            sameSite: 'None',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -62,7 +62,7 @@ const register = async (req, res) => {
         res.cookie('accessToken', accessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production', // Ensure HTTPS in production
-            sameSite: 'Strict', // Prevent CSRF
+            sameSite: 'None', // Prevent CSRF
             maxAge: 4 * 60 * 60 * 1000, // 4 hours expiration (for access token)
         });
 
@@ -157,14 +157,14 @@ const login = async (req, res) => {
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'Strict', // Allow refresh on subdomains
+            sameSite: 'None', // Allow refresh on subdomains
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
         res.cookie('accessToken', accessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production', // Ensure HTTPS in production
-            sameSite: 'Strict', // Prevent CSRF
+            sameSite: 'None', // Prevent CSRF
             maxAge: 4 * 60 * 60 * 1000, // 4 hours expiration (for access token)
         });
 
@@ -260,7 +260,7 @@ const refreshToken = async (req, res) => {
         res.cookie('refreshToken', newRefreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'Strict',
+            sameSite: 'None',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -268,7 +268,7 @@ const refreshToken = async (req, res) => {
         res.cookie('accessToken', newAccessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production', // Ensure HTTPS in production
-            sameSite: 'Strict', // Prevent CSRF
+            sameSite: 'None', // Prevent CSRF
             maxAge: 4 * 60 * 60 * 1000, // 4 hours expiration (for access token)
         });
 
@@ -306,14 +306,14 @@ const logout = async (req, res) => {
         res.clearCookie('accessToken', {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'Strict',
+            sameSite: 'None',
         });
 
         // Clear the refresh token from the cookie
         res.clearCookie('refreshToken', {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'Strict',
+            sameSite: 'None',
         });
 
         res.status(200).json({message: 'Logged out successfully.'});
@@ -352,14 +352,14 @@ const logoutMobile = async (req, res) => {
         res.clearCookie('accessToken', {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'Strict',
+            sameSite: 'None',
         });
 
         // Clear the refresh token from the cookie
         res.clearCookie('refreshToken', {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'Strict',
+            sameSite: 'None',
         });
 
         res.status(200).json({message: 'Logged out successfully.'});
@@ -484,4 +484,3 @@ module.exports = {
     resetPassword,
     changePassword
 };
-
