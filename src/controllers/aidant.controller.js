@@ -271,7 +271,7 @@ const setAuthCookie = (res, accessToken) => {
     res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "None",
+        sameSite: "Strict",
         maxAge: 4 * 60 * 60 * 1000,
     });
 };
