@@ -157,7 +157,7 @@ const sendContactForm = async (req, res) => {
         const mailOptions = {
             from: '"WINGer Contact" <contact@winger.fr>',
             // to: 'support@winger.fr', // your support or contact email
-            to: "noore@solal-digital-mauritius.com", // your support or contact email
+            to: "contact@winger.fr", // your support or contact email
             subject: `Nouveau message de contact: ${subject}`,
             html: `
         <div style="font-family: Arial, sans-serif; color: #333; padding: 20px;">
