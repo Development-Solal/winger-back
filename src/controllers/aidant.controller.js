@@ -272,6 +272,7 @@ const setAuthCookie = (res, accessToken) => {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "None",
+        domain: '.winger.fr',
         maxAge: 4 * 60 * 60 * 1000,
     });
 };

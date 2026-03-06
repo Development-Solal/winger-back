@@ -63,6 +63,7 @@ const register = async (req, res) => {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production', // Ensure HTTPS in production
             sameSite: 'None', // Prevent CSRF
+            domain: '.winger.fr',
             maxAge: 4 * 60 * 60 * 1000, // 4 hours expiration (for access token)
         });
 
@@ -158,6 +159,7 @@ const login = async (req, res) => {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'None', // Allow refresh on subdomains
+            domain: '.winger.fr',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -165,6 +167,7 @@ const login = async (req, res) => {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production', // Ensure HTTPS in production
             sameSite: 'None', // Prevent CSRF
+            domain: '.winger.fr',
             maxAge: 4 * 60 * 60 * 1000, // 4 hours expiration (for access token)
         });
 
@@ -261,6 +264,7 @@ const refreshToken = async (req, res) => {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'None',
+            domain: '.winger.fr',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
 
@@ -269,6 +273,7 @@ const refreshToken = async (req, res) => {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production', // Ensure HTTPS in production
             sameSite: 'None', // Prevent CSRF
+            domain: '.winger.fr',
             maxAge: 4 * 60 * 60 * 1000, // 4 hours expiration (for access token)
         });
 
