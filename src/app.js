@@ -19,6 +19,7 @@ const allowedOrigins = [
     'https://winger-front.devsolalco.workers.dev',
     'https://preprod.winger.fr',
     'https://www.winger.fr',
+    'https://www.preprod.winger.fr'
     'https://winger.fr',
     'http://localhost:3000',
     'http://localhost:5173',
