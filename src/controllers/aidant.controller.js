@@ -606,7 +606,7 @@ const updateProfileAidant = async (req, res) => {
                 first_name,
                 last_name,
                 email,
-                profile_pic: profilePicPath,
+                ...(profilePicPath && {profile_pic: profilePicPath}), // only update if new file uploaded
                 age_id: age,
                 town_id: closest_town,
                 commune_id: commune
@@ -693,7 +693,7 @@ const updateProfileAidantPro = async (req, res) => {
                 first_name,
                 last_name,
                 email,
-                profile_pic: profilePicPath,
+                ...(profilePicPath && {profile_pic: profilePicPath}), // only update if new file uploaded
                 town_id: closest_town,
             },
             {transaction}
