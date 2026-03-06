@@ -16,6 +16,8 @@ const setupSocket = (server) => {
                     'https://winger-front-prod.pages.dev',
                     'https://preprod.winger.fr',
                     'https://winger.fr',
+                    'https://www.winger.fr',
+                    'https://www.preprod.winger.fr',
                     'https://dev.winger.fr', // Added
                     'http://localhost:3000', // Added for development
                     'http://localhost:5173', // Added for development
