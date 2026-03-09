@@ -25,7 +25,6 @@ const logger = require("../utils/logger");
 const {
     uploadToO2Switch,
     cleanupTempFile,
-    getPublicUrl
 } = require("../utils/fileUpload");
 
 //new
@@ -38,17 +37,6 @@ const storage = multer.diskStorage({
     }
 });
 
-// Multer configuration
-const storage2 = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, "assets/aidant/profile_pics");
-    },
-    filename: (req, file, cb) => {
-        const extension = path.extname(file.originalname);
-        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-        cb(null, `aidant-profile-pic-${uniqueSuffix}${extension}`);
-    },
-});
 
 const gdprConsentService = require("../services/gdprConsentService");
 
@@ -58,7 +46,6 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 }
 }).single("profile_pic");
 
-const upload2 = multer({storage}).single("profile_pic");
 
 const createUser = async (email, hashedPassword, first_name, last_name, emailToken, transaction) => {
     const defaultCredits = parseInt(process.env.DEFAULT_CREDITS_ON_REGISTRATION, 10) || 0;
@@ -128,17 +115,33 @@ const handleMulterUpload = (req, res, fileType) => {
     });
 };
 
-const handleMulterUpload2 = (req, res) => {
+
+// Add this after handleMulterUpload and before handleMulterUpload2
+
+const handleOptionalUpload = (req, res, fileType) => {
     return new Promise((resolve, reject) => {
-        upload(req, res, (err) => {
+        upload(req, res, async (err) => {
             if (err) {
-                console.error("Multer error:", err.message, err.stack);
                 return reject({status: 400, message: "File upload failed."});
             }
+
             if (!req.file) {
-                return reject({status: 400, message: "Profile Pic upload failed."});
+                return resolve(); // ✅ no file is fine for updates
             }
-            resolve();
+
+            try {
+                const result = await uploadToO2Switch(req.file.path, fileType);
+                await cleanupTempFile(req.file.path);
+                req.uploadedFile = {
+                    url: result.url,
+                    path: result.path,
+                    filename: result.filename
+                };
+                resolve();
+            } catch (uploadError) {
+                await cleanupTempFile(req.file.path);
+                reject({status: 500, message: "Upload to storage failed"});
+            }
         });
     });
 };
@@ -562,12 +565,9 @@ const createProfileAidantProMobile = async (req, res) => {
 
 const updateProfileAidant = async (req, res) => {
     try {
-        await handleMulterUpload(req, res, 'aidant-profile-pic');
+        await handleOptionalUpload(req, res, 'aidant-profile-pic');
     } catch (uploadError) {
-        // Allow updates without file upload
-        if (uploadError.message !== "Profile Pic upload failed.") {
-            return res.status(uploadError.status || 400).json({message: uploadError.message});
-        }
+        return res.status(uploadError.status || 400).json({message: uploadError.message});
     }
 
     const {userId} = req.params;
@@ -639,13 +639,12 @@ const updateProfileAidant = async (req, res) => {
     }
 };
 
+
 const updateProfileAidantPro = async (req, res) => {
     try {
-        await handleMulterUpload(req, res, 'aidant-profile-pic');
+        await handleOptionalUpload(req, res, 'aidant-profile-pic');
     } catch (uploadError) {
-        if (uploadError.message !== "Profile Pic upload failed.") {
-            return res.status(uploadError.status || 400).json({message: uploadError.message});
-        }
+        return res.status(uploadError.status || 400).json({message: uploadError.message});
     }
 
     const {userId} = req.params;
