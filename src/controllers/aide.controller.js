@@ -27,6 +27,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const logger = require("../utils/logger");
+const {Op} = require("sequelize");
 
 //new
 const {
@@ -63,10 +64,9 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 }
 }).single("profile_pic");
 
-const upload2 = multer({storage}).single("profile_pic");
+// const upload2 = multer({storage}).single("profile_pic");
 
-//new
-const handleMulterUpload = (req, res, fileType) => {
+const handleOptionalUpload = (req, res, fileType) => {
     return new Promise((resolve, reject) => {
         upload(req, res, async (err) => {
             if (err) {
@@ -74,45 +74,74 @@ const handleMulterUpload = (req, res, fileType) => {
             }
 
             if (!req.file) {
-                return reject({ status: 400, message: "No file uploaded." });
+                return resolve(); // ✅ no file is fine for updates
             }
 
             try {
-                console.log('📤 Uploading to o2switch...', {
-                    type: fileType,
-                    original: req.file.originalname
-                });
-
-                // Upload to o2switch with specific type
-                const result = await uploadToO2Switch(
-                    req.file.path,
-                    fileType
-                );
-
-                console.log('✅ Upload successful:', result);
-
-                // Cleanup temp
+                const result = await uploadToO2Switch(req.file.path, fileType);
                 await cleanupTempFile(req.file.path);
-
-                // Add to req
                 req.uploadedFile = {
                     url: result.url,
                     path: result.path,
                     filename: result.filename
                 };
-
                 resolve();
-
             } catch (uploadError) {
                 await cleanupTempFile(req.file.path);
-                reject({
-                    status: 500,
-                    message: "Upload to storage failed"
-                });
+                reject({ status: 500, message: "Upload to storage failed" });
             }
         });
     });
 };
+
+//new
+// const handleMulterUpload = (req, res, fileType) => {
+//     return new Promise((resolve, reject) => {
+//         upload(req, res, async (err) => {
+//             if (err) {
+//                 return reject({ status: 400, message: "File upload failed." });
+//             }
+//
+//             if (!req.file) {
+//                 return reject({ status: 400, message: "No file uploaded." });
+//             }
+//
+//             try {
+//                 console.log('📤 Uploading to o2switch...', {
+//                     type: fileType,
+//                     original: req.file.originalname
+//                 });
+//
+//                 // Upload to o2switch with specific type
+//                 const result = await uploadToO2Switch(
+//                     req.file.path,
+//                     fileType
+//                 );
+//
+//                 console.log('✅ Upload successful:', result);
+//
+//                 // Cleanup temp
+//                 await cleanupTempFile(req.file.path);
+//
+//                 // Add to req
+//                 req.uploadedFile = {
+//                     url: result.url,
+//                     path: result.path,
+//                     filename: result.filename
+//                 };
+//
+//                 resolve();
+//
+//             } catch (uploadError) {
+//                 await cleanupTempFile(req.file.path);
+//                 reject({
+//                     status: 500,
+//                     message: "Upload to storage failed"
+//                 });
+//             }
+//         });
+//     });
+// };
 
 //new
 const getProfilePicPath = (req) => {
@@ -123,7 +152,7 @@ const convertToNull = (value) => (value === "" ? null : value);
 
 // Create a new ProfileAide
 const createProfileAide = async (req, res) => {
-    
+
     // ✅ Always parse the request first (file is optional)
     await new Promise((resolve, reject) => {
         upload(req, res, (err) => {
@@ -600,118 +629,102 @@ const getFutureMoitieById = async (req, res) => {
     }
 };
 
+
 const updateProfileAide = async (req, res) => {
-    upload(req, res, async (err) => {
-        if (err) {
-            console.error("Multer error:", err);
-            return res.status(400).json({message: "File upload failed."});
+    try {
+        await handleOptionalUpload(req, res, 'aide-profile-pic');
+    } catch (uploadError) {
+        return res.status(uploadError.status || 400).json({message: uploadError.message});
+    }
+
+    const {aideId} = req.params;
+    const {
+        gender,
+        aidant_is_aide,
+        name,
+        age,
+        closest_town,
+        commune,
+        aidant_relation,
+        origine,
+        nationality,
+        language,
+        religion,
+        education,
+        height,
+        silhouette,
+        smoker,
+        tatoo,
+        kids,
+        passions,
+        description,
+        active,
+    } = req.body;
+
+    const transaction = await sequelize.transaction();
+
+    try {
+        const profileAide = await ProfileAide.findByPk(aideId, {transaction});
+        if (!profileAide) {
+            await transaction.rollback();
+            return res.status(404).json({message: "Aide profile not found."});
         }
 
-        const {aideId} = req.params;
-        const {
-            gender,
-            aidant_is_aide,
-            name,
-            age,
-            closest_town,
-            commune,
-            aidant_relation,
-            origine,
-            nationality,
-            language,
-            religion,
-            education,
-            height,
-            silhouette,
-            smoker,
-            tatoo,
-            kids,
-            passions,
-            description,
-            active,
-        } = req.body;
+        const profilePicPath = getProfilePicPath(req);
 
-        const transaction = await sequelize.transaction();
+        await profileAide.update(
+            {
+                ...(profilePicPath && {profile_pic: profilePicPath}), // only update if new file uploaded
+                name,
+                gender,
+                aidant_is_aide,
+                town_id: convertToNull(closest_town),
+                commune_id: convertToNull(commune),
+                aidant_relation,
+                age_id: convertToNull(age),
+                origine_id: convertToNull(origine),
+                nationality_id: convertToNull(nationality),
+                religion_id: convertToNull(religion),
+                education_id: convertToNull(education),
+                height_id: convertToNull(height),
+                silhouette_id: convertToNull(silhouette),
+                smoker_id: convertToNull(smoker),
+                tattoo_id: convertToNull(tatoo),
+                description,
+                active,
+            },
+            {transaction}
+        );
 
-        try {
-            const profileAide = await ProfileAide.findByPk(aideId, {transaction});
-            if (!profileAide) {
-                await transaction.rollback();
-                return res.status(404).json({message: "Aide profile not found."});
-            }
+        const passionArray = (Array.isArray(passions) ? passions : passions ? passions.split(",") : [])
+            .map(Number)
+            .filter((n) => !isNaN(n));
+        await profileAide.setPassions(passionArray, {transaction});
 
-            let profilePicPath = profileAide.profile_pic;
+        const kidsArray = (Array.isArray(kids) ? kids : kids ? kids.split(",") : [])
+            .map(Number)
+            .filter((n) => !isNaN(n));
+        await profileAide.setKids(kidsArray, {transaction});
 
-            if (req.file) {
-                profilePicPath = req.file ? `aide/profile_pics/${req.file.filename}` : null;
+        const languageArray = (Array.isArray(language) ? language : language ? language.split(",") : [])
+            .map(Number)
+            .filter((n) => !isNaN(n));
+        await profileAide.setLanguage(languageArray, {transaction});
 
-                if (profileAide.profile_pic) {
-                    const oldPicPath = path.join(__dirname, "../assets", profileAide.profile_pic);
-                    fs.unlink(oldPicPath, (err) => {
-                        if (err && err.code !== "ENOENT") {
-                            console.error("Error deleting old profile picture:", err);
-                        }
-                    });
-                }
-            }
+        await transaction.commit();
 
-            await profileAide.update(
-                {
-                    profile_pic: profilePicPath,
-                    name,
-                    gender,
-                    aidant_is_aide: aidant_is_aide,
-                    town_id: convertToNull(closest_town),
-                    commune_id: convertToNull(commune),
-                    aidant_relation,
-                    age_id: convertToNull(age),
-                    origine_id: convertToNull(origine),
-                    nationality_id: convertToNull(nationality),
-                    religion_id: convertToNull(religion),
-                    education_id: convertToNull(education),
-                    height_id: convertToNull(height),
-                    silhouette_id: convertToNull(silhouette),
-                    smoker_id: convertToNull(smoker),
-                    tattoo_id: convertToNull(tatoo),
-                    description,
-                    active,
-                },
-                {transaction}
-            );
-
-            const passionArray = (Array.isArray(passions) ? passions : passions ? passions.split(",") : [])
-                .map(Number)
-                .filter((n) => !isNaN(n));
-
-            await profileAide.setPassions(passionArray, {transaction});
-
-            const kidsArray = (Array.isArray(kids) ? kids : kids ? kids.split(",") : []).map(Number).filter((n) => !isNaN(n));
-
-            await profileAide.setKids(kidsArray, {transaction});
-
-            const languageArray = (Array.isArray(language) ? language : language ? language.split(",") : [])
-                .map(Number)
-                .filter((n) => !isNaN(n));
-
-            await profileAide.setLanguage(languageArray, {transaction});
-
-            await transaction.commit();
-
-            res.status(200).json({message: "Profile updated successfully", profileAide});
-        } catch (error) {
-            if (transaction.finished !== "rollback") {
-                await transaction.rollback();
-            }
-            console.error("Error updating ProfileAide:", error);
-            return res.status(500).json({message: error.message || "An unexpected error occurred."});
+        res.status(200).json({message: "Profile updated successfully", profileAide});
+    } catch (error) {
+        if (transaction.finished !== "rollback") {
+            await transaction.rollback();
         }
-    });
+        console.error("Error updating ProfileAide:", error);
+        return res.status(500).json({message: error.message || "An unexpected error occurred."});
+    }
 };
 
 const updateFutureMoitie = async (req, res) => {
-    console.log("req", req);
-    console.log("updating future moitié", req);
-    upload(req, res, async (err) => {
+    upload(req, res, async () => {
         const {aideId} = req.params;
         const {
             FMgender,
@@ -822,7 +835,6 @@ const updateFutureMoitie = async (req, res) => {
     });
 };
 
-const {Op} = require("sequelize");
 
 const deactivateProfileAide = async (req, res) => {
     const {aideId} = req.params;
@@ -851,7 +863,7 @@ const deactivateProfileAide = async (req, res) => {
             deleted = true;
         } else {
             gdprAideToDelete = await GdprAide.findByPk(aideId, {transaction});
-            
+
             if (gdprAideToDelete) {
                 aidantId = gdprAideToDelete.aidant_id; // Get from GDPR if not in ProfileAide
             }
@@ -906,12 +918,12 @@ const deactivateProfileAide = async (req, res) => {
                 if (conversationIds.length > 0) {
                     console.log(`Deleting ${conversationIds.length} conversations`);
 
-                    const message = 
-                    await Message.findAll({
-                where: { conversation_id: { [Op.in]: conversationIds } },
-                transaction
-            });
-            const messageIds = message.map(cp => cp.id);
+                    const message =
+                        await Message.findAll({
+                            where: { conversation_id: { [Op.in]: conversationIds } },
+                            transaction
+                        });
+                    const messageIds = message.map(cp => cp.id);
 
                     // Delete message statuses first
                     await MessageStatus.destroy({
@@ -927,9 +939,9 @@ const deactivateProfileAide = async (req, res) => {
                     await Message.destroy({
                         where: { conversation_id: { [Op.in]: conversationIds } },
                         transaction
-                    });  
-                    
-       
+                    });
+
+
 
                     // Delete participants
                     await Participant.destroy({
@@ -942,10 +954,10 @@ const deactivateProfileAide = async (req, res) => {
                         where: { id: { [Op.in]: conversationIds } },
                         transaction
                     });
-                    
+
 
                     await transaction.commit();
-                    return res.status(200).json({ 
+                    return res.status(200).json({
                         message: "Dernier aidé(e) supprimé. Toutes les conversations ont été supprimées.",
                         deletedConversations: conversationIds.length,
                         remainingAides: 0
