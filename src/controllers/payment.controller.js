@@ -1318,17 +1318,17 @@ const getLiveSubscription = async (req, res) => {
 // RESTORE APPLE PURCHASES
 // ═══════════════════════════════════════════════════════════
 const restoreApplePurchases = async (req, res) => {
-  const {purchaseTokens, userId} = req.body;
+  const {purchaseTokens, email} = req.body;
 
-  if (!purchaseTokens || !Array.isArray(purchaseTokens) || !userId) {
+  if (!purchaseTokens || !Array.isArray(purchaseTokens) || !email) {
     return res.status(400).json({
       error: 'Missing required fields',
-      required: ['purchaseTokens (array)', 'userId']
+      required: ['purchaseTokens (array)', 'email']
     });
   }
 
   try {
-    const user = await User.findByPk(userId);
+    const user = await User.findOne({where: {email}});
     if (!user) {
       return res.status(404).json({error: 'User not found'});
     }
@@ -1371,7 +1371,7 @@ const restoreApplePurchases = async (req, res) => {
       const existingOwner = await Subscription.findOne({
         where: {
           id: transaction.originalTransactionId,
-          aidant_id: {[Op.ne]: userId},
+          aidant_id: {[Op.ne]: user.id},
           status: {[Op.in]: ['active', 'cancelled']},
         }
       });
@@ -1383,7 +1383,7 @@ const restoreApplePurchases = async (req, res) => {
         if (ownerStillValid) {
           logger.warn('Restore blocked: subscription owned by another user', {
             originalTransactionId: transaction.originalTransactionId,
-            requestingUser: userId,
+            requestingUser: user.id,
             ownerUser: existingOwner.aidant_id,
           });
           return res.status(403).json({
@@ -1400,7 +1400,7 @@ const restoreApplePurchases = async (req, res) => {
 
       if (existingSub) {
         await existingSub.update({
-          aidant_id: userId,
+          aidant_id: user.id,
           status: 'active',
           next_billing_time: nextBillingTime,
           payment_method: 'apple',
@@ -1409,7 +1409,7 @@ const restoreApplePurchases = async (req, res) => {
       } else {
         await Subscription.create({
           id: transaction.originalTransactionId,
-          aidant_id: userId,
+          aidant_id: user.id,
           plan_id: 'unlimited_monthly_subscription',
           status: 'active',
           start_time: new Date(transaction.purchaseDate),
@@ -1425,6 +1425,7 @@ const restoreApplePurchases = async (req, res) => {
         productId: transaction.productId,
       };
 
+      const userId = user.id;
       logger.info('Subscription restored', {
         userId,
         originalTransactionId: transaction.originalTransactionId,
@@ -1444,7 +1445,7 @@ const restoreApplePurchases = async (req, res) => {
       message: 'No active subscriptions found to restore.',
     });
   } catch (error) {
-    logger.error('Apple restore error', {error: error.message, stack: error.stack, userId});
+    logger.error('Apple restore error', {error: error.message, stack: error.stack, email});
     return res.status(500).json({error: 'Restore failed', details: error.message});
   }
 };
